@@ -1,0 +1,309 @@
+---
+title: "data_processing"
+author: "Sylvain Moinard"
+date: "2023-07-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+# library(xlsx)
+library(readxl)
+# library(openxlsx)
+```
+
+# Data related to the manuscript
+
+***lister les items
+***chunks
+
+## Metabarcodes for marker Sper01 (gh)
+
+***virer les commentaires
+
+```{r}
+barcodes1 <- read_excel("new_plant_positive_control.xlsx")[,c(2,4:6)]
+names(barcodes1) <- c("species_name", "sequence", "length", "gc_content")
+
+# seq_spk1 <- "accctcagcctcgcccaaggttgaattatgaaacctgtgacggtcgggtc"
+# 
+# barcodes1 <- rbind(barcodes1,
+#                    data.frame(species_name = "Spike1",
+#                               sequence =  seq_spk1,
+#                               length = nchar(seq_spk1),
+#                               gc_content = sum(str_count(seq_spk1, c("c", "g")))/nchar(seq_spk1)))
+
+barcodes1[barcodes1$species_name == "Salvia_pratensis",]$sequence <- "atcctgttttctcaaaacaaaggttcaaaaaacgaaaaaaaaaaag"
+
+# barcodes1$longest_stretch <- sapply(barcodes1$sequence, function(x){
+#   nchar(unlist(str_extract_all(x, "(.)\\1+"))[which.max(nchar(unlist(str_extract_all(x, "(.)\\1+"))))])
+# })
+
+
+##Distance entre les références
+# 
+# distSper01 <- matrix(rep(NA, nrow(barcodes1)^2), nrow = nrow(barcodes1))
+# for (i in 1:nrow(barcodes1)){
+#   for (j in i:nrow(barcodes1)){
+#     distSper01[i,j] <- lcs_score(barcodes1$sequence[i], barcodes1$sequence[j], similarity_mode = "distance")$score
+#   }
+# }
+# distSper01
+```
+
+##DNA extraction
+
+```{r extraction}
+
+extraction <- read_excel("data/dosage extraction plantes.xlsx")
+extraction <- extraction[-nrow(extraction),]
+extraction <- extraction[,-(4:9)]
+```
+
+## ddPCR data
+
+Open, clean, summarise ddPCR data
+
+```{r ddPCR data}
+#First file
+dataddpcr1 <- read.csv("data/QMETABAR_MOINARD1204_manual.csv", header=FALSE)
+colnames(dataddpcr1) <- dataddpcr1[1,]
+dataddpcr1 <- dataddpcr1[-1,c(1,7,8,16,22)]
+
+dataddpcr1$Sample <- NA
+dataddpcr1$sp <- NA
+dataddpcr1$Dilu <- NA
+
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "01",]$Sample <- 100
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "01",]$sp <- "Spk1"
+
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "02",]$Sample <- 14
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "02",]$sp <- "Pa"
+
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "03",]$Sample <- 16
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "03",]$sp <- "Lx"
+
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "04",]$Sample <- 18
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "04",]$sp <- "Aa"
+
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "05",]$Sample <- 20
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "05",]$sp <- "Ac"
+
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "06",]$Sample <- 22
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "06",]$sp <- "Bm"
+
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "07",]$Sample <- -1
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "07",]$sp <- "Neg"
+
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "08",]$Sample <- 24
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "08",]$sp <- "Rc"
+
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "09",]$Sample <- 26
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "09",]$sp <- "Cbp"
+
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "10",]$Sample <- 28
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "10",]$sp <- "Gr"
+
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "11",]$Sample <- 30
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "11",]$sp <- "Rf"
+
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "12",]$Sample <- 32
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "12",]$sp <- "Lc"
+
+#Corrections
+
+dataddpcr1[dataddpcr1$Well %in% c("H07"),]$Sample <- 100
+dataddpcr1[dataddpcr1$Well %in% c("H07"),]$sp <- "Spk1"
+
+dataddpcr1[dataddpcr1$Well %in% c("H06"),]$Sample <- 20
+dataddpcr1[dataddpcr1$Well %in% c("H06"),]$sp <- "Ac"
+
+dataddpcr1[dataddpcr1$Well %in% c("H01", "A12", "B12"),]$Sample <- -1
+dataddpcr1[dataddpcr1$Well %in% c("H01", "A12", "B12"),]$sp <- "Neg"
+
+dataddpcr1[dataddpcr1$Well %in% c("H05"),]$Sample <- 22
+dataddpcr1[dataddpcr1$Well %in% c("H05"),]$sp <- "Bm"
+
+dataddpcr1[dataddpcr1$Well %in% c("A07", "B07"),]$Sample <- 32
+dataddpcr1[dataddpcr1$Well %in% c("A07", "B07"),]$sp <- "Lc"
+
+dataddpcr1[substr(dataddpcr1$Well, 1, 1) %in% c("A", "B"),]$Dilu <- 1
+dataddpcr1[substr(dataddpcr1$Well, 1, 1) %in% c("C", "D"),]$Dilu <- 2
+dataddpcr1[substr(dataddpcr1$Well, 1, 1) %in% c("E", "F"),]$Dilu <- 3
+dataddpcr1[substr(dataddpcr1$Well, 1, 1) %in% c("G", "H"),]$Dilu <- 4
+
+dataddpcr1$Concentration <- as.numeric(dataddpcr1$Concentration)
+dataddpcr1$AcceptedDroplets <- as.numeric(dataddpcr1$AcceptedDroplets)
+dataddpcr1$Negatives <- as.numeric(dataddpcr1$Negatives)
+
+#Manual calls :
+
+#Volume of a droplet
+#using the formula to determine concentration
+Vdroplet <- log(dataddpcr1[dataddpcr1$Status == "OK",]$AcceptedDroplets/
+        dataddpcr1[dataddpcr1$Status == "OK",]$Negatives)/
+  dataddpcr1[dataddpcr1$Status == "OK",]$Concentration #ul
+
+vdroplet <- mean(Vdroplet)
+
+dataddpcr1[dataddpcr1$Status == "CHECK",]$Concentration <-
+  log(dataddpcr1[dataddpcr1$Status == "CHECK",]$AcceptedDroplets/
+        dataddpcr1[dataddpcr1$Status == "CHECK",]$Negatives)/vdroplet
+
+#Second file
+
+dataddpcr2 <- read.csv("data/QMETABAR_MOINARD_140422_manual.csv",
+                        header=FALSE)
+colnames(dataddpcr2) <- dataddpcr2[1,]
+dataddpcr2 <- dataddpcr2[-1,c(1,4,6,7,8,16,22)]
+
+colnames(dataddpcr2)[3] <- "Dilu" #Target
+dataddpcr2$sp <- NA
+dataddpcr2$Sample <- as.numeric(dataddpcr2$Sample)
+
+dataddpcr2[dataddpcr2$Sample == 100,]$sp <- "Spk1"
+dataddpcr2[dataddpcr2$Sample == -1,]$sp <- "Neg"
+dataddpcr2[dataddpcr2$Sample == 4,]$sp <- "Sp"
+dataddpcr2[dataddpcr2$Sample == 6,]$sp <- "Pt"
+dataddpcr2[dataddpcr2$Sample == 8,]$sp <- "Ra"
+dataddpcr2[dataddpcr2$Sample == 10,]$sp <- "Cbe"
+dataddpcr2[dataddpcr2$Sample == 12,]$sp <- "Fe"
+dataddpcr2[dataddpcr2$Sample == 20,]$sp <- "Ac"
+dataddpcr2[dataddpcr2$Sample == 32,]$sp <- "Lc"
+
+dataddpcr2$Concentration <- as.numeric(dataddpcr2$Concentration)
+dataddpcr2$AcceptedDroplets <- as.numeric(dataddpcr2$AcceptedDroplets)
+dataddpcr2$Negatives <- as.numeric(dataddpcr2$Negatives)
+
+#Manual calls:
+Vdroplet2 <- log(dataddpcr2[dataddpcr2$Status == "OK",]$AcceptedDroplets/
+                      dataddpcr2[dataddpcr2$Status == "OK",]$Negatives)/
+  dataddpcr2[dataddpcr2$Status == "OK",]$Concentration #ul
+
+vdroplet2 <- mean(Vdroplet2)
+
+dataddpcr2[dataddpcr2$Status == "CHECK",]$Concentration <-
+  log(dataddpcr2[dataddpcr2$Status == "CHECK",]$AcceptedDroplets/
+        dataddpcr2[dataddpcr2$Status == "CHECK",]$Negatives)/vdroplet2
+
+####Merge 2 plates ####
+dataddpcr1$plate <- 1
+dataddpcr2$plate <- 2
+
+dataddpcr <- rbind(dataddpcr1, dataddpcr2)
+
+dataddpcr$Dilu <- as.numeric(dataddpcr$Dilu)
+
+#Removing concentrations outliers
+dataddpcr$Used <- F
+
+sample_OK <- c(4, 6, 10, 12, 16, 18, 20, 22, 24, 26, 28, 30, 32, 100)
+
+dataddpcr[dataddpcr$Sample == 4,]$Used  <- T
+dataddpcr[dataddpcr$Sample == 6 & dataddpcr$Status == "OK",]$Used <- T
+dataddpcr[dataddpcr$Sample == 10,]$Used <- T
+dataddpcr[dataddpcr$Sample == 12,]$Used <- T
+dataddpcr[dataddpcr$Sample == 16,]$Used <- T
+dataddpcr[dataddpcr$Sample == 18 &
+             dataddpcr$Dilu < 4,]$Used <- T
+dataddpcr[dataddpcr$Sample == 20 &
+             dataddpcr$Status != "CHECK",]$Used <- T
+dataddpcr[dataddpcr$Sample == 22 &
+             dataddpcr$Dilu < 4,]$Used <- T
+dataddpcr[dataddpcr$Sample == 24 &
+             dataddpcr$Dilu < 4 & dataddpcr$Status != "CHECK",]$Used <- T
+dataddpcr[dataddpcr$Sample == 26 &
+             dataddpcr$Dilu < 4,]$Used <- T
+dataddpcr[dataddpcr$Sample == 28 &
+             dataddpcr$Dilu < 4,]$Used <- T
+dataddpcr[dataddpcr$Sample == 30 &
+             dataddpcr$Dilu < 4,]$Used <- T
+dataddpcr[dataddpcr$Sample == 32 &
+             dataddpcr$Dilu < 4 &
+             !(dataddpcr$Well %in%c("E12", "F12")),]$Used <- T
+dataddpcr[dataddpcr$Sample == 100 &
+             dataddpcr$Dilu < 4 &
+             dataddpcr$Status != "CHECK" &
+             !(dataddpcr$Well %in%c("H03")),]$Used <- T
+
+#Volumes
+Vmix_dd <- 20 #ul
+Vdna_dd <- 5 #ul
+
+CtotDNA_ref <- 2.5e-3 *Vdna_dd/Vmix_dd
+
+maxDNA <- 0.25 *Vdna_dd/Vmix_dd #ng/ul
+dataddpcr$TotalDNA <- maxDNA/10^(dataddpcr$Dilu-1)
+
+dataddpcr <- dataddpcr %>%
+  mutate(Concentration_std = Concentration*CtotDNA_ref/TotalDNA)
+
+
+summary_dd <- dataddpcr %>% filter(Used & Sample < 100) %>%
+  group_by(Sample) %>%
+  summarise(sp = sp[1],
+            Mean = mean(Concentration*CtotDNA_ref/TotalDNA),
+            min = min(Concentration*CtotDNA_ref/TotalDNA),
+            max = max(Concentration*CtotDNA_ref/TotalDNA)) %>%
+  left_join(extraction %>% select(Espece, Sample, `concentration (ng/µl`)) %>%
+  rename(CDNA_sample = `concentration (ng/µl`,
+         Cmolecules_ref = Mean,
+         species_name = Espece) %>%
+  select(Sample, species_name, sp, Cmolecules_ref, CDNA_sample)
+  
+
+
+#Reference species: Pt (most concentrated) -> 2nd row***
+
+#***write... peut-être summary dans l'autre fichier ?
+```
+
+## Tags PCR metabarcoding
+
+Open tags
+
+```{r}
+primers1 <- read.table("data/DEL0455463409_bis.csv",
+                       header = T, sep = ",", na.strings = c("N/A", "-"))
+primers1 <- primers1[,-which(is.na(primers1[1,]))]
+
+primers2 <- read.table("data/DEL0455483280_bis.csv",
+                       header = T, sep = ",", na.strings = c("N/A", "-"))
+primers2 <- primers2[,-which(is.na(primers2[1,]))]
+
+primers <- rbind(primers1, primers2)
+
+primers$Well.col <- as.numeric(substr(primers$Well.position, 2, 3))
+primers$Well.row <- substr(primers$Well.position, 1, 1)
+primers$Marker <- substr(primers$Name, 1, 6)
+primers$Direction <- substr(primers$Name, 7, 7)
+
+primers$Sper_seq <- NULL
+primers[primers$Marker == "SPER01" & primers$Direction == "F",
+        "Sper_seq"] <- "GGGCAATCCTGAGCCAA"
+primers[primers$Marker == "SPER01" & primers$Direction == "R",
+        "Sper_seq"] <- "CCATTGAGTCTCTGCACCTATC"
+
+colnames(primers)[8] <- "Sequence"
+
+primers$Tag <- sapply(1:nrow(primers),
+                      function(i){
+                        substr(primers[i,]$Sequence,1,
+                               str_locate(
+                                 primers[i,]$Sequence,
+                                 primers[i,]$Sper_seq)-1)})
+
+primers$Tag8 <- substr(primers$Tag, nchar(primers$Tag)-8+1,
+                       nchar(primers$Tag))
+```
+
+###***archives
+
+```{r}
+moyenne$unite_Volume_unif <- (moyenne$moy[2])/moyenne$moy
+summary(moyenne$moy)
+hist(moyenne$moy[-14])
+```
+
