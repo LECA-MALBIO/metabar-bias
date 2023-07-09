@@ -178,8 +178,6 @@ ggplot(data_dd_fig)+
 
 Pipeline from raw data: see data_processing file
 
-***inclure ici les contaminants/négatifs ??
-
 Open data, filter bad PCR replicates.
 
 ```{r open metabarcoding data}
@@ -591,7 +589,33 @@ res_taqman %>% group_by(probe) %>%
 
 ```
 
-***remettre le calcul du tirage des 2/3 réplicats 
+
+```{r 2 replicates}
+flam <- function(p){
+  10^(-1/p)-1
+}
+
+res_lm_test <- NULL
+
+for (s in unique(res_taqman$probe)){
+  for (try in 1:100){
+    reg <- lm(Cq ~ log10(copies),
+              res_taqman %>%
+                filter(probe == s & !Neg) %>%
+                group_by(Dilu) %>%
+                summarise(Cq = mean(Cq[sample(1:n(), 2)]),
+                          copies = Vmix_taq*copies_ul[1]))
+    res_lm_test <- rbind(res_lm_test,
+                         data.frame(probe = s,
+                                    slope = reg$coefficients[2]))
+  }
+}
+
+res_lm_test %>% group_by(probe) %>% summarise(min = min(slope),
+                                              max = max(slope)) %>%
+  mutate(lmin = flam(min), lmax = flam(max), gap = lmax - lmin)
+
+```
 
 ###RFU Threshold for each well
 

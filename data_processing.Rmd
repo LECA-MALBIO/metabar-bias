@@ -269,6 +269,8 @@ Three communities:
 
 #### Gobipairing
 
+Paired-end data
+
 % gobipairing -F 220930_NB501850_A_L1-4_GWM-1746_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1746_R2.fastq.gz > GWM-1746.paired
 
 % gobipairing -F 220930_NB501850_A_L1-4_GWM-1748_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1748_R2.fastq.gz > GWM-1748.paired
@@ -285,6 +287,8 @@ Three communities:
 
 #### Gobimultiplex
 
+Assigns sequence records to the corresponding experiment/sample based on DNA tags and primers
+
 % gobimultiplex -t GWM-1746_L1.ngsfilter -u unassigned46 GWM-1746.paired > GWM_1746.demultiplex
 
 % gobimultiplex -t GWM-1748_G1.ngsfilter -u unassigned48 GWM-1748.paired > GWM_1748.demultiplex
@@ -293,15 +297,20 @@ Three communities:
 
 #### Gobiuniq
 
+Groups and dereplicates sequences
 Merge the libraries
 
 % gobiuniq -m direction -m sample --on-disk GWM_1746.demultiplex GWM_1748.demultiplex GWM_1750.demultiplex > GWM_Sper01.uniq
 
 #### Gobigrep
 
+Filters sequence file
+
 % gobigrep -c 2 -l 25 -L 75 GWM_Sper01.uniq > GWM_Sper01.grep
 
 #### Gobiclean
+
+Tags a set of sequences for PCR/sequencing errors identification
 
 % gobiclean --save-ratio graphSper01.csv --min-eval-rate 100 --save-graph graph1 GWM_Sper01.grep > GWM_Sper01.clean
 
