@@ -8,4 +8,7 @@ entete
 fig_qmetabar.R
 qpcr.Rmd
 taqman.Rmd
+<<<<<<< HEAD
 .DS_Store
+=======
+>>>>>>> d9076ad3e3db0f1d37db99846e97962cff1155b3
