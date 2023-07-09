@@ -1,66 +1,66 @@
+
 ---
-title: "data_processing"
-author: "Sylvain Moinard"
-date: "2023-07-03"
+title: 'How much PCR amplification is biasing DNA metabarcoding results ? - data processing'
+author:
+  - name: Sylvain Moinard
+    institute: leca
+    email: sylvain.moinard@univ-grenoble-alpes.fr
+    correspondence: true
+  - name: Didier Piau
+    institute: ijf
+  - name: Frédéric Laporte
+    institute: leca
+  - name: Delphine Rioux
+    institute: leca
+  - name: Christelle Gonindard-Melodelima
+    institute: leca
+  - name: Eric Coissac
+    institute: leca
+    email: eric.coissac@metabarcoding.org 
+    correspondence: true
+institute:
+  - leca: Univ. Grenoble-Alpes, Univ. Savoie Mont Blanc, CNRS, LECA, 38000, Grenoble, France.
+  - ijf: Univ. Grenoble-Alpes, CNRS, Institut Joseph Fourier, 38000, Grenoble, France.
 output: html_document
 ---
+
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
 library(dplyr)
-# library(xlsx)
 library(readxl)
-# library(openxlsx)
+library(tidyverse)
+
+#install_url("https://git.metabarcoding.org/obitools/obitools4/robireadfasta")
+library(ROBIFastread)
 ```
 
 # Data related to the manuscript
 
-***lister les items
-***chunks
-
 ## Metabarcodes for marker Sper01 (gh)
 
-***virer les commentaires
+Salvia pratensis has a different barcode as in the database (one insertion)
 
-```{r}
-barcodes1 <- read_excel("new_plant_positive_control.xlsx")[,c(2,4:6)]
+```{r open reference}
+barcodes1 <- read_excel("data/new_plant_positive_control.xlsx")[,c(2,4:6)]
 names(barcodes1) <- c("species_name", "sequence", "length", "gc_content")
 
-# seq_spk1 <- "accctcagcctcgcccaaggttgaattatgaaacctgtgacggtcgggtc"
-# 
-# barcodes1 <- rbind(barcodes1,
-#                    data.frame(species_name = "Spike1",
-#                               sequence =  seq_spk1,
-#                               length = nchar(seq_spk1),
-#                               gc_content = sum(str_count(seq_spk1, c("c", "g")))/nchar(seq_spk1)))
+barcodes1[barcodes1$species_name ==
+            "Salvia_pratensis",]$sequence <- "atcctgttttctcaaaacaaaggttcaaaaaacgaaaaaaaaaaag"
 
-barcodes1[barcodes1$species_name == "Salvia_pratensis",]$sequence <- "atcctgttttctcaaaacaaaggttcaaaaaacgaaaaaaaaaaag"
-
-# barcodes1$longest_stretch <- sapply(barcodes1$sequence, function(x){
-#   nchar(unlist(str_extract_all(x, "(.)\\1+"))[which.max(nchar(unlist(str_extract_all(x, "(.)\\1+"))))])
-# })
-
-
-##Distance entre les références
-# 
-# distSper01 <- matrix(rep(NA, nrow(barcodes1)^2), nrow = nrow(barcodes1))
-# for (i in 1:nrow(barcodes1)){
-#   for (j in i:nrow(barcodes1)){
-#     distSper01[i,j] <- lcs_score(barcodes1$sequence[i], barcodes1$sequence[j], similarity_mode = "distance")$score
-#   }
-# }
-# distSper01
 ```
 
-##DNA extraction
+## DNA extraction
 
 ```{r extraction}
-
-extraction <- read_excel("data/dosage extraction plantes.xlsx")
+extraction <- read_excel(
+  "data/dosage extraction plantes.xlsx")
 extraction <- extraction[-nrow(extraction),]
 extraction <- extraction[,-(4:9)]
 ```
+
 
 ## ddPCR data
 
@@ -68,7 +68,8 @@ Open, clean, summarise ddPCR data
 
 ```{r ddPCR data}
 #First file
-dataddpcr1 <- read.csv("data/QMETABAR_MOINARD1204_manual.csv", header=FALSE)
+dataddpcr1 <- read.csv("data/QMETABAR_MOINARD1204_manual.csv",
+                       header=FALSE)
 colnames(dataddpcr1) <- dataddpcr1[1,]
 dataddpcr1 <- dataddpcr1[-1,c(1,7,8,16,22)]
 
@@ -188,7 +189,7 @@ dataddpcr2[dataddpcr2$Status == "CHECK",]$Concentration <-
   log(dataddpcr2[dataddpcr2$Status == "CHECK",]$AcceptedDroplets/
         dataddpcr2[dataddpcr2$Status == "CHECK",]$Negatives)/vdroplet2
 
-####Merge 2 plates ####
+#Merge 2 plates
 dataddpcr1$plate <- 1
 dataddpcr2$plate <- 2
 
@@ -240,7 +241,6 @@ dataddpcr$TotalDNA <- maxDNA/10^(dataddpcr$Dilu-1)
 dataddpcr <- dataddpcr %>%
   mutate(Concentration_std = Concentration*CtotDNA_ref/TotalDNA)
 
-
 summary_dd <- dataddpcr %>% filter(Used & Sample < 100) %>%
   group_by(Sample) %>%
   summarise(sp = sp[1],
@@ -252,622 +252,179 @@ summary_dd <- dataddpcr %>% filter(Used & Sample < 100) %>%
          Cmolecules_ref = Mean,
          species_name = Espece) %>%
   select(Sample, species_name, sp, Cmolecules_ref, CDNA_sample)
-  
 
-
-#Reference species: Pt (most concentrated) -> 2nd row***
-
-#***write... peut-être summary dans l'autre fichier ?
+# write_csv(dataddpcr, "data/dataddpcr.csv")
 ```
 ## Metabarcoding data processing
 
-Using the OBITools version 4 (git***)
+Processing the data with OBITools version 4
+(https://git.metabarcoding.org/obitools/obitools4/obitools4)
 
-***Commandes bash
+Three communities:
+* L1 = uniform in Total DNA (renamed T in the paper)
+* G1 = Geometric
+* U1 = Uniform
 
-***Trois communautés
+### Bash commands
 
-gobipairing***
+#### Gobipairing
 
-gobipairing -F 220930_NB501850_A_L1-4_GWM-1746_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1746_R2.fastq.gz > GWM-1746.paired
+% gobipairing -F 220930_NB501850_A_L1-4_GWM-1746_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1746_R2.fastq.gz > GWM-1746.paired
 
-gobipairing -F 220930_NB501850_A_L1-4_GWM-1748_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1748_R2.fastq.gz > GWM-1748.paired
+% gobipairing -F 220930_NB501850_A_L1-4_GWM-1748_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1748_R2.fastq.gz > GWM-1748.paired
 
-gobipairing -F 220930_NB501850_A_L1-4_GWM-1750_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1750_R2.fastq.gz > GWM-1750.paired
+% gobipairing -F 220930_NB501850_A_L1-4_GWM-1750_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1750_R2.fastq.gz > GWM-1750.paired
 
-***json -> ngsfilter
+#### Convert json (made by metabase api) to ngsfilter
 
-python3 format_ngsfilter_sylvain.py ngs_filter_tube_U1_EC_QMETABAR_210722.json GWM-1750_U1 ***verif nom
+% python3 format_ngsfilter_sylvain.py ngs_filter_tube_L1_EC_QMETABAR_210722.json GWM-1746_L1
 
-python3 format_ngsfilter_sylvain.py ngs_filter_tube_L1_EC_QMETABAR_210722.json GWM-1751_L1
+% python3 format_ngsfilter_sylvain.py ngs_filter_tube_G1_EC_QMETABAR_210722.json GWM-1748_G1
 
-python3 format_ngsfilter_sylvain.py ngs_filter_tube_G1_EC_QMETABAR_210722.json GWM-1751_G1
+% python3 format_ngsfilter.py ngs_filter_tube_U1_EC_QMETABAR_210722.json GWM-1750_U1
 
-Gobimultiplex
+#### Gobimultiplex
 
-gobimultiplex -t NGSFilter/GWM-1746_L1.ngsfilter -u unassigned46 GWM-1746.paired > GWM_1746.demultiplex
+% gobimultiplex -t GWM-1746_L1.ngsfilter -u unassigned46 GWM-1746.paired > GWM_1746.demultiplex
 
-gobimultiplex -t NGSFilter/GWM-1748_G1.ngsfilter -u unassigned48 GWM-1748.paired > GWM_1748.demultiplex
+% gobimultiplex -t GWM-1748_G1.ngsfilter -u unassigned48 GWM-1748.paired > GWM_1748.demultiplex
 
-gobimultiplex -t NGSFilter/GWM-1750_U1.ngsfilter -u unassigned50 GWM-1750.paired > GWM_1750.demultiplex
+% gobimultiplex -t GWM-1750_U1.ngsfilter -u unassigned50 GWM-1750.paired > GWM_1750.demultiplex
 
-***Gobicount
+#### Gobiuniq
 
-gobicount GWM_1746.paired
-gobicount GWM_1746.demultiplex
-gobicount unassigned46
+Merge the libraries
 
-***Gobiuniq
+% gobiuniq -m direction -m sample --on-disk GWM_1746.demultiplex GWM_1748.demultiplex GWM_1750.demultiplex > GWM_Sper01.uniq
 
-gobiuniq -m direction -m sample --on-disk 1746.demultiplex.clean_neg 1748.demultiplex.clean_neg 1750.demultiplex.clean_neg > GWM_Sper01.uniq
+#### Gobigrep
 
-***Gobigrep
+% gobigrep -c 2 -l 25 -L 75 GWM_Sper01.uniq > GWM_Sper01.grep
 
-gobigrep -c 2 -l 25 -L 75 -O GWM_Sper01.uniq > GWM_Sper01.grep
+#### Gobiclean
 
-***gobiclean
+% gobiclean --save-ratio graphSper01.csv --min-eval-rate 100 --save-graph graph1 GWM_Sper01.grep > GWM_Sper01.clean
 
-gobiclean -O --save-ratio graphSper01.csv --min-eval-rate 100 --save-graph graph1 GWM_Sper01.grep > GWM_Sper01.clean
+#### Gobicount
+
+Reads / Variants
+
+% gobicount GWM-1746.paired
+3352859 / 3352859
+
+% gobicount GWM_1746.demultiplex
+3043811 / 3043811
+
+% gobicount unassigned46
+309048 / 309048
+
+% gobicount GWM-1748.paired
+4025048 / 4025048
+
+% gobicount GWM_1748.demultiplex
+3683622 / 3683622
+
+% gobicount unassigned48
+341426 / 341426
 
 
+% gobicount GWM-1750.paired
+3910259 / 3910259
 
-obitools 4 : ref
-robireadfasta, robitools...
+% gobicount GWM_1750.demultiplex
+3618993 / 3618993
+
+% gobicount unassigned50
+291266 / 291266
 
 
+% gobicount GWM_Sper01.uniq
+151109 / 10346426
 
-### Lecture des données de Qmetabar Sper01
+% gobicount GWM_Sper01.grep
+28371 / 10202369
 
-```{r}
-data_Sper01 <- read.delim(paste0(path, "../data_qmetabar/GWM-1746-1752/data/Qmetabar_Sper01.csv"))
+% gobicount GWM_Sper01.clean
+28371 / 10202369
 
-data_Sper01 %>%
-  select(-starts_with(c("obiclean_weight."))) %>%
-  pivot_longer(
-    cols = starts_with("sample."),
-    names_to = "Sample",
-    names_prefix = "sample.",
-    values_to = "count_sample") %>%
-  select(c("count", "direction.direct", "direction.reverse", "obiclean_head",
-           "obiclean_headcount", "obiclean_internalcount", "obiclean_samplecount",
-           "obiclean_singletoncount", "seq_rank", "Sample", "count_sample", "sequence")) -> df_Sper01
+#### Robireadfasta
 
-dataaux1 <- data_Sper01 %>%
-  select(c("sequence", starts_with("obiclean_weight."))) %>%
-  pivot_longer(
-    cols = starts_with("obiclean_weight."),
-    names_to = "Sample",
-    names_prefix = "obiclean_weight.",
-    values_to = "obiclean_weight")
+Fasta files are read with the R library ROBIFastread available here:
+https://git.metabarcoding.org/obitools/obitools4/robireadfasta
 
-df_Sper01 %>%
-  left_join(dataaux1, by = c("sequence" = "sequence", "Sample" = "Sample")) -> df_Sper01
+### Import Metabarcoding data
 
-rm(dataaux1)
+The data come from a larger experiment. We remove every replicate containing Spike molecules.
 
-df_Sper01$Community <- substr(df_Sper01$Sample, 1, 1)
-df_Sper01$NegControl <- df_Sper01$Community == "P"
+```{r open metabarcoding data}
+data_Sper01 <- read_obifasta("data/GWM_Sper01.clean")
+
+weights <- extract_readcount(data_Sper01,
+                    key = "obiclean_weight")
+
+reads <- extract_readcount(data_Sper01)
+df_reads <- Matrix::summary(reads)
+df_reads <- data.frame(Sample = rownames(reads)[df_reads$i],
+           id = colnames(reads)[df_reads$j],
+           reads = df_reads$x)
+
+df_Sper01 <- Matrix::summary(weights)
+
+df_Sper01 <- data.frame(Sample = rownames(weights)[df_Sper01$i],
+           id = colnames(weights)[df_Sper01$j],
+           obiclean_weight = df_Sper01$x) %>%
+  left_join(df_reads) %>%
+  left_join(data_Sper01 %>% select(id, sequence)) %>%
+  mutate(Community = substr(Sample, 1, 1),
+         NegControl = Community == "P")
 
 df_Sper01[df_Sper01$Community == "P", "Community"] <- substr(df_Sper01[df_Sper01$Community == "P",]$Sample, 8, 8)
+df_Sper01[df_Sper01$Community == "L", "Community"] <- "T"
 
 df_Sper01$Spike_level <- NA
 df_Sper01[!df_Sper01$NegControl,"Spike_level"] <- as.numeric(substr(df_Sper01[!df_Sper01$NegControl,]$Sample, 4, 4))
 
 df_Sper01[df_Sper01$NegControl,"Spike_level"] <- as.numeric(substr(df_Sper01[df_Sper01$NegControl,]$Sample, 12, 12))
 
-df_Sper01 %>% filter(count_sample > 0) %>%
+df_Sper01 <- df_Sper01 %>% filter(Spike_level == 1) #***
+
+summary_sample <- df_Sper01 %>%
   group_by(Sample) %>%
-  summarise(sum_count_sample = sum(count_sample), variants = length(unique(sequence))) -> summary_Sper01
+  summarise(total_count_sample = sum(reads),
+            NegControl = NegControl[1],
+            Spike_level = Spike_level[1],
+            Community = Community[1]) %>%
+  arrange(total_count_sample)
 
-df_Sper01 %>% left_join(summary_Sper01[,-3], by = "Sample") -> df_Sper01
+summary_species <- df_Sper01 %>%
+  group_by(sequence) %>%
+  summarise(count = sum(reads)) %>%
+  arrange(desc(count))
 
-summary_Sper01$Community <- substr(summary_Sper01$Sample, 1, 1)
-summary_Sper01$NegControl <- summary_Sper01$Community == "P"
-summary_Sper01[summary_Sper01$NegControl, "Community"] <- substr(summary_Sper01[summary_Sper01$Community == "P",]$Sample, 8, 8)
+summary_species$seq_rank <- 1:nrow(summary_species)
 
-summary_Sper01$Spike_level <- NA
-summary_Sper01[!summary_Sper01$NegControl,"Spike_level"] <- as.numeric(substr(summary_Sper01[!summary_Sper01$NegControl,]$Sample, 4, 4))
-
-summary_Sper01[summary_Sper01$NegControl,"Spike_level"] <- as.numeric(substr(summary_Sper01[summary_Sper01$NegControl,]$Sample, 12, 12))
-
-df_Sper01 %>%
-  left_join(barcodes1, by = c("sequence" = "sequence")) %>%
-  arrange(desc(count)) -> df_Sper01
-
-df_Sper01$obiclean_head <- ifelse(df_Sper01$obiclean_head == "true", T, F)
+df_Sper01 <- df_Sper01 %>% left_join(summary_sample[,1:2]) %>%
+  left_join(summary_species) %>%
+  left_join(barcodes1) %>%
+  arrange(desc(count))
 
 df_Sper01[is.na(df_Sper01$species_name),"species_name"] <- as.character(df_Sper01[is.na(df_Sper01$species_name),]$seq_rank)
 
+# write_csv(df_Sper01, "data/df_Sper01.csv")
 
 ```
 
+Export data to Julia for Taqman analysis
 
-***recréer df_Sper01...
-***on dirait que clean (et non clean_singleton) n'est pas dans le bon format...
-
-```{r}
-data_Sper01 <- read_obifasta(
-  "~/Documents/These/Projet_QMetabar/data_qmetabar/GWM-1746-1752/data/GWM_Sper01.clean") #***données à transvaser, check poids
-# 
-weight_sp01 <- extract_readcount(data_Sper01,
-                           key = "obiclean_weight")
-# 
-# reads_sp01 <- extract_readcount(data_Sper01_sing)
-
-
-# a <- sapply(1:ncol(reads_sp01), function(i) sum(reads_sp01[,i]))
-# summary(a)
-# max(df_Sper01$count)
-# 
-# max(reads_sp01)
-# max(df_Sper01$count_sample)
-# 
-# max(weight_sp01)
-# max(df_Sper01$obiclean_weight, na.rm = T)
-```
-
-
-***inclure ici les contaminants/négatifs ??
-
-tri des pcr...***
-
-```{r}
-
-ggplot(summary_Sper01[!summary_Sper01$NegControl,])+
-  geom_boxplot(aes(x = factor(Spike_level), y = sum_count_sample))+
-  facet_wrap(.~Community)
-
-ggplot(summary_Sper01)+
-  geom_point(aes(x = rank, y = sum_count_sample, col = factor(Spike_level), shape = Community))+
-  labs(col = "Spike_level")+
-  geom_hline(yintercept = reads_threshold)
-
+```{r export julia}
 reads_threshold <- 5000
-```
 
-
-### ***Pour Unif Sper01
-
-***commurecap
-
-```{r}
-#Préparation du sous-tableau
-
-df_Sper01_targetU <- df_Sper01[df_Sper01$Community == "U" & df_Sper01$species_name %in% barcodes1$species_name & df_Sper01$species_name != "Rumex_acetosa",]
-
-df_Sper01_targetU$prop <- df_Sper01_targetU$obiclean_weight/df_Sper01_targetU$sum_count_sample
-
-commuU1 <- commu_recap[commu_recap$Sper == 1 & commu_recap$commu == "Uniform",]
-
-commuU1$prop_expected <- commuU1$moleculesmicrol/commuU1$sum_molecules
-commuU1$Spike_level <- commuU1$Spk+1
-
-df_Sper01_targetU$prop_nospk <- 0
-for (s in unique(df_Sper01_targetU$Sample)){
-  df_Sper01_targetU[df_Sper01_targetU$Sample == s,"prop_nospk"] <- df_Sper01_targetU[df_Sper01_targetU$Sample == s,]$obiclean_weight/
-    (sum(df_Sper01_targetU[df_Sper01_targetU$Sample == s & df_Sper01_targetU$species_name != "Spike1",]$obiclean_weight, na.rm = T))
-}
-
-commuU1$prop_expected_nospk <- NA
-for (spk in unique(commuU1$Spike_level)){
-  commuU1[commuU1$Spike_level == spk,"prop_expected_nospk"] <- commuU1[commuU1$Spike_level == spk,]$moleculesmicrol/(sum(commuU1[commuU1$Spike_level == spk & commuU1$sp != "Spk",]$moleculesmicrol))
-}
-commuU1[commuU1$sp == "Spk",]$prop_expected_nospk <- 0
-  
-df_Sper01_targetU <- df_Sper01_targetU %>%
-  left_join(commuU1[,c("species_name", "prop_expected", "prop_expected_nospk", "Spike_level")], by = c("species_name" = "species_name", "Spike_level" = "Spike_level"))
-```
-
-***vérif l'utilité de tous les sous-jeux de données du genre statU1
-idem : a-t-on besoin des dfT1, recapT1...?
-
-```{r}
-df_Sper01_targetU %>% filter(!NegControl & sum_count_sample > reads_threshold) %>%
-  group_by(species_name, Spike_level)%>%
-  summarise(mean = mean(prop_nospk),
-            med = median(prop_nospk),
-            exp = prop_expected_nospk[1],
-            sd = sd(prop_nospk)) -> statU1
-
-ggplot(statU1)+
-  geom_point(aes(Spike_level, mean/exp, col = species_name), shape = 1)+
-  geom_point(aes(Spike_level, med/exp, col = species_name), shape = 3)+
-  geom_line(aes(Spike_level, mean/exp, col = species_name))+
-  geom_line(aes(Spike_level, med/exp, col = species_name))+
-  ggtitle("Uniform community - Sper01\nWithout Spike reads")+
-  labs(y = "Observed/expected proportions\nmean and median", x = "Spike level", col = "Species")+
-  geom_hline(yintercept = 1, linetype = "dashed")
-
-# ggsave(filename = "prop_spklevel_U1.png")
-
-statU1 %>% filter(species_name != "Spike1") %>%
-  group_by(Spike_level) %>% summarise(mmoy = max(mean)/min(mean),
-                                               mmed = max(med)/min(med))
-
-```
-
-
-
-##### Pour UniTot Sper01
-
-```{r}
-#Préparation du sous-tableau
-
-df_Sper01_targetT <- df_Sper01[df_Sper01$Community == "T" &
-                                 df_Sper01$species_name %in% barcodes1$species_name & df_Sper01$species_name != "Rumex_acetosa",]
-
-df_Sper01_targetT$prop <- df_Sper01_targetT$obiclean_weight/df_Sper01_targetT$sum_count_sample
-
-commuT1 <- commu_recap[commu_recap$Sper == 1 & commu_recap$commu == "uniform in Total DNA",]
-
-commuT1$prop_expected <- commuT1$moleculesmicrol/commuT1$sum_molecules
-commuT1$Spike_level <- commuT1$Spk+1
-
-df_Sper01_targetT$prop_nospk <- 0
-for (s in unique(df_Sper01_targetT$Sample)){
-  df_Sper01_targetT[df_Sper01_targetT$Sample == s,"prop_nospk"] <- df_Sper01_targetT[df_Sper01_targetT$Sample == s,]$obiclean_weight/
-    (sum(df_Sper01_targetT[df_Sper01_targetT$Sample == s & df_Sper01_targetT$species_name != "Spike1",]$obiclean_weight, na.rm = T))
-}
-
-commuT1$prop_expected_nospk <- NA
-for (spk in unique(commuT1$Spike_level)){
-  commuT1[commuT1$Spike_level == spk,"prop_expected_nospk"] <- commuT1[commuT1$Spike_level == spk,]$moleculesmicrol/(sum(commuT1[commuT1$Spike_level == spk & commuT1$sp != "Spk",]$moleculesmicrol))
-}
-commuT1[commuT1$sp == "Spk",]$prop_expected_nospk <- 0
-  
-df_Sper01_targetT %>%
-  left_join(commuT1[,c("species_name", "prop_expected", "prop_expected_nospk", "Spike_level")],
-            by = c("species_name" = "species_name", "Spike_level" = "Spike_level"))  -> df_Sper01_targetT
-
-df_Sper01_targetT %>% filter(Spike_level == 4) %>%
-  group_by(species_name) %>%
-  distinct(species_name, .keep_all = T) %>%
-  summarise(rank = prop_expected) %>%
-  right_join(df_Sper01_targetT, by = "species_name") %>%
-  mutate(species_name = fct_reorder(species_name, rank)) -> df_Sper01_targetT
-```
-
-
-
-
-```{r}
-df_Sper01_targetT %>% filter(species_name != "Spike1" & !NegControl & sum_count_sample > reads_threshold) %>%
-  group_by(species_name, Spike_level)%>%
-  summarise(mean = mean(prop_nospk), med = median(prop_nospk), exp = prop_expected_nospk[1], sd = sd(prop_nospk)) -> statT1
-
-ggplot(statT1)+
-  geom_point(aes(Spike_level, mean/exp, col = species_name), shape = 1)+
-  geom_point(aes(Spike_level, med/exp, col = species_name), shape = 3)+
-  geom_line(aes(Spike_level, mean/exp, col = species_name))+
-  geom_line(aes(Spike_level, med/exp, col = species_name))+
-  ggtitle("UniTot community - Sper01\nWithout Spike reads")+
-  labs(y = "Observed/expected proportions\nmean and median", x = "Spike level", col = "Species")+
-  geom_hline(yintercept = 1, linetype = "dashed")
-
-# ggsave(filename = "prop_spklevel_T1.png")
-
-statT1 %>% group_by(Spike_level) %>% summarise(mmoy = max(mean)/min(mean),
-                                               mmed = max(med)/min(med))
-
-```
-
-
-***Inclure : les données sont issues d'une expérience plus vaste comportant un Spike. Dans le cadre de ce projet, seulement les pcr sans spike sont conservées.
-
-
-##### Pour Geom Sper01
-
-```{r}
-#Préparation du sous-tableau
-
-df_Sper01_targetG <- df_Sper01[df_Sper01$Community == "G" & df_Sper01$species_name %in% barcodes1$species_name & df_Sper01$species_name != "Rumex_acetosa",]
-
-df_Sper01_targetG$prop <- df_Sper01_targetG$obiclean_weight/df_Sper01_targetG$sum_count_sample
-
-commuG1 <- commu_recap[commu_recap$Sper == 1 & commu_recap$commu == "Geometric",]
-
-commuG1$prop_expected <- commuG1$moleculesmicrol/commuG1$sum_molecules
-commuG1$Spike_level <- commuG1$Spk+1
-
-df_Sper01_targetG$prop_nospk <- 0
-for (s in unique(df_Sper01_targetG$Sample)){
-  df_Sper01_targetG[df_Sper01_targetG$Sample == s,"prop_nospk"] <- df_Sper01_targetG[df_Sper01_targetG$Sample == s,]$obiclean_weight/
-    (sum(df_Sper01_targetG[df_Sper01_targetG$Sample == s & df_Sper01_targetG$species_name != "Spike1",]$obiclean_weight, na.rm = T))
-}
-
-commuG1$prop_expected_nospk <- NA
-for (spk in unique(commuG1$Spike_level)){
-  commuG1[commuG1$Spike_level == spk,"prop_expected_nospk"] <- commuG1[commuG1$Spike_level == spk,]$moleculesmicrol/(sum(commuG1[commuG1$Spike_level == spk & commuG1$sp != "Spk",]$moleculesmicrol))
-}
-commuG1[commuG1$sp == "Spk",]$prop_expected_nospk <- 0
-  
-df_Sper01_targetG %>%
-  left_join(commuG1[,c("species_name", "prop_expected", "prop_expected_nospk", "Spike_level")], by = c("species_name" = "species_name", "Spike_level" = "Spike_level")) -> df_Sper01_targetG
-
-df_Sper01_targetG %>% filter(Spike_level == 4) %>%
-  group_by(species_name) %>% distinct(species_name, .keep_all = T) %>%
-  summarise(rank = ifelse(species_name == "Spike1", 1, prop_expected)) %>% right_join(df_Sper01_targetG, by = "species_name") %>%
-  mutate(species_name = fct_reorder(species_name, rank)) -> df_Sper01_targetG
-```
-
-
-
-
-07/06/23
-La correction est revue de manière simplifiée par rapport au code :
-
-Comme on normalise, on peut écrire quele facteur correctif est
-
-a_s = prop_obs(s)/prop_init(s) (* constante)
-
-puis prop_infer(s) = prop_obs(s)/a_s^commuU
-
-
-```{r}
-#Pour le groupe sans spike
-
-#Facteur correctif
-
-ordre <- df_Sper01_targetG %>% filter(species_name != "Spike1") %>% group_by(species_name) %>%
-  summarise(ordre = rank[1]) %>% pull(species_name)
-
-correcU1 <- df_Sper01_targetU %>% filter(species_name != "Spike1" &
-                               Spike_level == 1 &
-                               sum_count_sample > reads_threshold &
-                               !NegControl) %>%
-  group_by(species_name) %>%
-  summarise(med_prop = median(prop)/(1/13))
-
-#U
-
-df_inferU <- df_Sper01_targetU %>%
-                     filter(sum_count_sample > reads_threshold &
-                            !NegControl &
-                            species_name != "Spike1" &
-                              Spike_level == 1)
-
-df_inferU[is.na(df_inferU$prop),"prop"] <- 0
-df_inferU <- df_inferU %>% left_join(correcU1)
-
-df_inferU$prop_infer <- df_inferU$prop/df_inferU$med_prop
-
-df_inferU <- df_inferU %>%
-  group_by(Sample) %>%
-  mutate(prop_infer = prop_infer/sum(prop_infer, na.rm = T))
-
-df_inferU$species_name <- factor(df_inferU$species_name, levels = ordre,
-                                 ordered = T)
-
-#T
-
-df_inferT <- df_Sper01_targetT %>%
-                     filter(sum_count_sample > reads_threshold &
-                            !NegControl &
-                            species_name != "Spike1" &
-                              Spike_level == 1)
-
-df_inferT[is.na(df_inferT$prop),"prop"] <- 0
-df_inferT <- df_inferT %>% left_join(correcU1)
-
-df_inferT$prop_infer <- df_inferT$prop/df_inferT$med_prop
-
-df_inferT <- df_inferT %>%
-  group_by(Sample) %>%
-  mutate(prop_infer = prop_infer/sum(prop_infer, na.rm = T))
-
-df_inferT$species_name <- factor(df_inferT$species_name, levels = ordre,
-                                 ordered = T)
-
-#G
-
-df_inferG <- df_Sper01_targetG %>%
-                     filter(sum_count_sample > reads_threshold &
-                            !NegControl &
-                            species_name != "Spike1" &
-                              Spike_level == 1)
-
-df_inferG[is.na(df_inferG$prop),"prop"] <- 0
-df_inferG <- df_inferG %>% left_join(correcU1)
-
-df_inferG$prop_infer <- df_inferG$prop/df_inferG$med_prop
-
-df_inferG <- df_inferG %>%
-  group_by(Sample) %>%
-  mutate(prop_infer = prop_infer/sum(prop_infer, na.rm = T))
-
-df_inferG$species_name <- factor(df_inferG$species_name, levels = ordre,
-                                 ordered = T)
-
-```
-
-
-```{r}
-##T1 corrigée par U1
-
-df_Sper01_targetT[is.na(df_Sper01_targetT$prop),]$prop <- 0
-df_Sper01_targetT$prop_infer <- NA
-for (s in unique(recapT1$species_name)){
-  df_Sper01_targetT[df_Sper01_targetT$species_name == s,"prop_infer"] <- df_Sper01_targetT[df_Sper01_targetT$species_name == s,]$prop/
-    recapU1[recapU1$species_name == s,]$slope[1]
-}
-df_Sper01_targetT %>%
-  group_by(Sample) %>%
-  mutate(prop_infer = prop_infer/sum(prop_infer, na.rm = T)) -> df_Sper01_targetT
-
-df_Sper01_targetT %>% group_by(Sample) %>% summarise(sum(prop_infer, na.rm = T))
-
-colp <- c("Expected" = "gold")
-
-gobsT1 <- ggplot(df_Sper01_targetT[df_Sper01_targetT$sum_count_sample > reads_threshold&
-                                     !df_Sper01_targetT$NegControl &df_Sper01_targetT$species_name != "Spike1",])+
-  geom_boxplot(aes(species_name, prop_nospk, fill = factor(Spike_level)))+
-  theme(axis.title.x = element_blank(),
-        axis.text.x=element_blank())+
-  ggtitle("Uniform in Total DNA community - Sper01\nProportions without Spike reads")+
-  theme(plot.title = element_text(hjust = 0.5))+
-  geom_text(aes(3, 0.25, label = "Raw data"), size = 4)+
-  labs(y = "Observed proportion", x = "Species",
-       fill = "Spike\nlevel", col = "")+
-  geom_point(data = commuT1[commuT1$species_name != "Spike1" & commuT1$Spike_level == 1,],
-             aes(species_name, prop_expected, col = "Expected"), shape = 18,
-             size = 3)+
-  scale_color_manual(values = colp)
-
-ginferT1 <- ggplot(df_Sper01_targetT[df_Sper01_targetT$sum_count_sample > reads_threshold &
-                                       !df_Sper01_targetT$NegControl & df_Sper01_targetT$species_name != "Spike1",])+
-  geom_boxplot(aes(species_name, prop_infer, fill = factor(Spike_level)))+
-  geom_text(aes(3, 0.2, label = "Corrected data"), size = 4)+
-  theme(axis.text.x = element_text(angle = 25, hjust = 1))+
-  labs(y = "Inferred proportion", x = "",
-       fill = "Spike\nlevel", col = "")+
-  geom_point(data = commuT1[commuT1$species_name != "Spike1" &
-                              commuT1$Spike_level == 1,],
-             aes(species_name, prop_expected, col = "Expected"), shape = 18,
-             size = 3)+
-  scale_color_manual(values = colp)
-
-ggpubr::ggarrange(gobsT1, ginferT1,
-                  ncol = 1,
-                  common.legend = T,
-                  legend = "right",
-                  heights = c(1.65, 2))
-
-# ggsave("obs_infer_propT1.png", units = "mm", height = 120, width = 200)
-
-
-df_Sper01_targetT %>% filter(sum_count_sample > reads_threshold &
-                           !NegControl & species_name != "Spike1") %>%
-  group_by(species_name, Spike_level) %>%
-  summarise(prop_nospk = median(prop_nospk),
-            prop_infer = median(prop_infer)) %>%
-  left_join(commuT1[commuT1$species_name != "Spike1" & commuT1$Spike_level == 1,
-                    c("species_name", "prop_expected")]) -> resT1
-
-sqrt(sum((resT1$prop_nospk-resT1$prop_expected)^2)/nrow(resT1))
-sqrt(sum((resT1$prop_infer-resT1$prop_expected)^2)/nrow(resT1))
-
-sqrt(sum(((resT1$prop_nospk-resT1$prop_expected)/resT1$prop_expected)^2)/nrow(resT1))
-sqrt(sum(((resT1$prop_infer-resT1$prop_expected)/resT1$prop_expected)^2)/nrow(resT1))
-```
-
-
-```{r}
-##G1 corrigée par U1
-
-df_Sper01_targetG[is.na(df_Sper01_targetG$prop),]$prop <- 0
-df_Sper01_targetG$prop_infer <- NA
-for (s in unique(recapG1$species_name)){
-  df_Sper01_targetG[df_Sper01_targetG$species_name == s,"prop_infer"] <- df_Sper01_targetG[df_Sper01_targetG$species_name == s,]$prop/
-    recapU1[recapU1$species_name == s,]$slope[1]
-}
-df_Sper01_targetG %>%
-  group_by(Sample) %>%
-  mutate(prop_infer = prop_infer/sum(prop_infer, na.rm = T)) -> df_Sper01_targetG
-
-df_Sper01_targetG %>% group_by(Sample) %>% summarise(sum(prop_infer, na.rm = T))
-
-gobsG1 <- ggplot(df_Sper01_targetG[df_Sper01_targetG$sum_count_sample > reads_threshold&
-                           !df_Sper01_targetG$NegControl &df_Sper01_targetG$species_name != "Spike1",])+
-  geom_boxplot(aes(species_name, prop_nospk, fill = factor(Spike_level)))+
-  theme(axis.title.x = element_blank(),
-        axis.text.x=element_blank())+
-  labs(y = "Observed proportion", x = "Species",
-       fill = "Spike\nlevel")+
-  ggtitle("Geometric community - Sper01\nProportions without Spike reads")+
-  geom_point(data = commuG1[commuG1$species_name != "Spike1" &
-                              commuG1$Spike_level == 1,],
-             aes(species_name, prop_expected), shape = 23, fill = "gold", size = 3)+
-  scale_y_log10()
-
-ginferG1 <- ggplot(df_Sper01_targetG[df_Sper01_targetG$sum_count_sample > reads_threshold&
-                           !df_Sper01_targetG$NegControl &df_Sper01_targetG$species_name != "Spike1",])+
-  geom_boxplot(aes(species_name, prop_infer, fill = factor(Spike_level)))+
-  theme(axis.text.x = element_text(angle = 25, hjust = 1))+
-  labs(y = "Inferred proportion", x = "",
-       fill = "Spike\nlevel")+
-  geom_point(data = commuG1[commuG1$species_name != "Spike1" & commuG1$Spike_level == 1,],
-             aes(species_name, prop_expected), shape = 23, fill = "gold", size = 3)+
-  scale_y_log10()
-
-ggpubr::ggarrange(gobsG1, ginferG1,
-                  ncol = 1,
-                  common.legend = T,
-                  legend = "right",
-                  heights = c(1.65, 2))
-
-# ggsave("obs_infer_propG1.png")
-
-df_Sper01_targetG %>% filter(sum_count_sample > reads_threshold &
-                               !NegControl & species_name != "Spike1") %>%
-  group_by(species_name, Spike_level) %>%
-  summarise(prop_nospk = median(prop_nospk),
-            prop_infer = median(prop_infer)) %>%
-  left_join(commuG1[commuG1$species_name != "Spike1" & commuG1$Spike_level == 1,
-                    c("species_name", "prop_expected")]) -> resG1
-
-sqrt(sum((resG1$prop_nospk-resG1$prop_expected)^2)/nrow(resG1))
-sqrt(sum((resG1$prop_infer-resG1$prop_expected)^2)/nrow(resG1))
-
-sqrt(sum(((resG1$prop_nospk-resG1$prop_expected)/resG1$prop_expected)^2)/nrow(resG1))
-sqrt(sum(((resG1$prop_infer-resG1$prop_expected)/resG1$prop_expected)^2)/nrow(resG1))
-
-```
-
-
-
-
-
-Critère pour évaluer les distances commu-attendu
-
-```{r}
-resU1 <- df_inferU %>% group_by(species_name) %>%
-  summarise(prop = median(prop), prop_expected = prop_expected[1],
-            prop_infer = median(prop_infer))
-
-resT1 <- df_inferT %>% group_by(species_name) %>%
-  summarise(prop = median(prop), prop_expected = prop_expected[1],
-            prop_infer = median(prop_infer))
-
-resG1 <- df_inferG %>% group_by(species_name) %>%
-  summarise(prop = median(prop), prop_expected = prop_expected[1],
-            prop_infer = median(prop_infer))
-
-#RMSE
-
-#U
-summary(resU1$prop)
-
-sqrt(sum((resU1$prop-resU1$prop_expected)^2)/nrow(resU1))
-sqrt(sum((resU1$prop_infer-resU1$prop_expected)^2)/nrow(resU1))
-
-sqrt(sum(((resU1$prop-resU1$prop_expected)/resU1$prop_expected)^2)/nrow(resU1))
-sqrt(sum(((resU1$prop_infer-resU1$prop_expected)/resU1$prop_expected)^2)/nrow(resU1))
-
-#T
-summary(resT1$prop)
-
-sqrt(sum((resT1$prop-resT1$prop_expected)^2)/nrow(resT1))
-sqrt(sum((resT1$prop_infer-resT1$prop_expected)^2)/nrow(resT1))
-
-sqrt(sum(((resT1$prop-resT1$prop_expected)/resT1$prop_expected)^2)/nrow(resT1))
-sqrt(sum(((resT1$prop_infer-resT1$prop_expected)/resT1$prop_expected)^2)/nrow(resT1))
-
-#RMSE de T si on considère que c'est une commu uniforme...
-sqrt(sum((resT1$prop-resU1$prop_expected)^2)/nrow(resT1))
-sqrt(sum(((resT1$prop-resU1$prop_expected)/resT1$prop_expected)^2)/nrow(resT1))
-
-#G
-sqrt(sum((resG1$prop-resG1$prop_expected)^2)/nrow(resG1))
-sqrt(sum((resG1$prop_infer-resG1$prop_expected)^2)/nrow(resG1))
-
-sqrt(sum(((resG1$prop-resG1$prop_expected)/resG1$prop_expected)^2)/nrow(resG1))
-sqrt(sum(((resG1$prop_infer-resG1$prop_expected)/resG1$prop_expected)^2)/nrow(resG1))
-```
-Export vers Julia pour Taqman
-
-```{r}
 ##Commu U
-auxU <- df_inferU %>%
+auxU <- df_Sper01 %>% filter(Community == "U" &
+                                   species_name %in% barcodes1$species_name &
+                        species_name != "Rumex_acetosa" &
+                          total_count_sample > reads_threshold &
+                          !NegControl) %>%
   filter(species_name %in%
            c("Fraxinus_excelsior", "Carpinus_betulus", "Capsella_bursa-pastoris")) %>%
   select(species_name, obiclean_weight) %>%
@@ -875,75 +432,41 @@ auxU <- df_inferU %>%
   pivot_wider(names_from = species_name, values_from = obiclean_weight)
 
 matU <- as.matrix(auxU[,-1])
-# write.csv(matU, paste0(path, "dfSper01U_taq.csv"))
-
-auxU_complete <- df_inferU %>%
-  filter(!species_name %in%
-           c("Fraxinus_excelsior", "Carpinus_betulus", "Capsella_bursa-pastoris")) %>%
-  select(species_name, obiclean_weight) %>%
-  group_by(Sample) %>%
-  summarise(Rest = sum(obiclean_weight))
-
-auxU_complete <- auxU %>% left_join(auxU_complete)
-matU_complete <- as.matrix(auxU_complete[,-1])
-# write.csv(matU_complete,
-#           paste0(path, "dfSper01U_taq_complete.csv"))
+# write.csv(matU, "data/dfSper01U_taq.csv")
 
 ##Commu T
-auxT <- df_inferT %>%
+auxT <- df_Sper01 %>% filter(Community == "T" &
+                                   species_name %in% barcodes1$species_name &
+                        species_name != "Rumex_acetosa" &
+                          total_count_sample > reads_threshold &
+                          !NegControl) %>%
   filter(species_name %in%
            c("Fraxinus_excelsior", "Carpinus_betulus", "Capsella_bursa-pastoris")) %>%
   select(species_name, obiclean_weight) %>%
   arrange(species_name) %>%
   pivot_wider(names_from = species_name, values_from = obiclean_weight)
 matT <- as.matrix(auxT[,-1])
-# write.csv(matT, paste0(path, "dfSper01T_taq.csv"))
-
-auxT_complete <- df_inferT %>%
-  filter(!species_name %in%
-           c("Fraxinus_excelsior", "Carpinus_betulus", "Capsella_bursa-pastoris")) %>%
-  select(species_name, obiclean_weight) %>%
-  group_by(Sample) %>%
-  summarise(Rest = sum(obiclean_weight))
-
-auxT_complete <- auxT %>% left_join(auxT_complete)
-matT_complete <- as.matrix(auxT_complete[,-1])
-# write.csv(matT_complete,
-#           paste0(path, "dfSper01T_taq_complete.csv"))
+# write.csv(matT, "data/dfSper01T_taq.csv")
 
 ##Commu G
-auxG <- df_inferG %>%
+auxG <- df_Sper01 %>% filter(Community == "G" &
+                                   species_name %in% barcodes1$species_name &
+                        species_name != "Rumex_acetosa" &
+                          total_count_sample > reads_threshold &
+                          !NegControl) %>%
   filter(species_name %in%
            c("Fraxinus_excelsior", "Carpinus_betulus", "Capsella_bursa-pastoris")) %>%
   select(species_name, obiclean_weight) %>%
   arrange(species_name) %>%
   pivot_wider(names_from = species_name, values_from = obiclean_weight)
 matG <- as.matrix(auxG[,-1])
-# write.csv(matG, paste0(path, "dfSper01G_taq.csv"))
+# write.csv(matG, "data/dfSper01G_taq.csv")
 
-auxG_complete <- df_inferG %>%
-  filter(!species_name %in%
-           c("Fraxinus_excelsior", "Carpinus_betulus", "Capsella_bursa-pastoris")) %>%
-  select(species_name, obiclean_weight) %>%
-  group_by(Sample) %>%
-  summarise(Rest = sum(obiclean_weight, na.rm = T))
-
-auxG_complete <- auxG %>% left_join(auxG_complete)
-matG_complete <- as.matrix(auxG_complete[,-1])
-# write.csv(matG_complete,
-#           paste0(path, "dfSper01G_taq_complete.csv"))
 ```
-
-
-
-
-
-
-
 
 ## Taqman qPCR
 
-```{r}
+```{r pipeline taqman}
 taqman <- summary_dd %>%
   filter(Sample %in% c(10,12, 26)) %>%
   select(Sample, species_name, sp, Cmolecules_ref, CDNA_sample) %>%
@@ -952,19 +475,19 @@ taqman <- summary_dd %>%
 #Reference concentration = sample Cbe 10
 
 #3rd level concentration
-cref_taqman <- 2.484696e-03 #ng/ul total DNA ***max cdna_repli de Cbe 10 dans qpcr3
+cref_taqman <- 2.484696e-03 #ng/ul total DNA
 
 #5-fold serial dilution
 #Concentration (total DNA) of each dilution level
-cref_taqman*c(25,5,1,1/5,1/25) #***verif que c'est bien les bonnes valeurs
+cref_taqman*c(25,5,1,1/5,1/25)
 
-#***nombre de copies/microl à cref_taqman : dans le volume d'ADN
+#Copies/ul at cref_taqman in the sample
 taqman[taqman$Sample == 10,]$Cmolecules_ref*cref_taqman/CtotDNA_ref
 
 Vdna_taq <- 5 #ul
 Vmix_taq <- 25 #ul
 
-#***Copies/ul at cref_taqman in the taqman mix
+#Copies/ul at cref_taqman in the taqman mix
 taqman[taqman$Sample == 10,]$Cmolecules_ref*
   cref_taqman/CtotDNA_ref*Vdna_taq/Vmix_taq
 
@@ -1000,11 +523,13 @@ taqman5$copies_ul <- taqman4$copies_ul/5
 taqman5$CDNA_well <- taqman4$CDNA_well/5
 
 taqman <- rbind(taqman1, taqman2, taqman3, taqman4, taqman5)
+
+# write_csv(taqman, "data/taqman.csv")
 ```
 
 ## Tags for metabarcoding PCR
 
-```{r}
+```{r metabarcoding tags}
 primers1 <- read.table("data/DEL0455463409_bis.csv",
                        header = T, sep = ",", na.strings = c("N/A", "-"))
 primers1 <- primers1[,-which(is.na(primers1[1,]))]
@@ -1039,11 +564,4 @@ primers$Tag8 <- substr(primers$Tag, nchar(primers$Tag)-8+1,
                        nchar(primers$Tag))
 ```
 
-###***archives
-
-```{r}
-moyenne$unite_Volume_unif <- (moyenne$moy[2])/moyenne$moy
-summary(moyenne$moy)
-hist(moyenne$moy[-14])
-```
 
