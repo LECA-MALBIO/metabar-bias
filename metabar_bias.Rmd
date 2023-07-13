@@ -37,12 +37,9 @@ library(glue)
 library(readxl)
 library(tidyverse)
 
-# library(readr)
-# library(stringr)
-
-# library(openxlsx)
-# library(xlsx)
-# library(purrr)
+options(rgl.useNULL=TRUE)
+library(rgl)
+library(qpcR)
 
 ```
 
@@ -75,11 +72,11 @@ summary_dd <- dataddpcr %>% filter(Used & Sample < 100) %>%
             Mean = mean(Concentration*CtotDNA_ref/TotalDNA),
             min = min(Concentration*CtotDNA_ref/TotalDNA),
             max = max(Concentration*CtotDNA_ref/TotalDNA)) %>%
-  left_join(extraction %>% select(Espece, Sample, `concentration (ng/µl`)) %>%
+  left_join(extraction %>% dplyr::select(Espece, Sample, `concentration (ng/µl`)) %>%
   rename(CDNA_sample = `concentration (ng/µl`,
          Cmolecules_ref = Mean,
          species_name = Espece) %>%
-  select(Sample, species_name, sp, Cmolecules_ref, CDNA_sample)
+  dplyr::select(Sample, species_name, sp, Cmolecules_ref, CDNA_sample)
 ```
 
 ## Metabarcoding preparation 
@@ -145,9 +142,9 @@ Figure 2 of the manuscript
 
 ```{r ddpcr analysis}
 data_dd_fig <- dataddpcr %>% filter(Used & Sample < 100) %>%
-  left_join(summary_dd %>% select(sp, species_name, RankG))
+  left_join(summary_dd %>% dplyr::select(sp, species_name, RankG))
 
-order_short <- summary_dd %>% select(sp, RankG) %>%
+order_short <- summary_dd %>% dplyr::select(sp, RankG) %>%
   arrange(-RankG) %>% pull(sp)
 
 highlight <- function(x, pat, color="black", family="") {
@@ -226,7 +223,7 @@ df_targetU <- df_Sper01 %>% filter(Community == "U" &
                           total_count_sample > reads_threshold &
                           !NegControl) %>%
   mutate(prop = obiclean_weight/total_count_sample) %>%
-  left_join(summary_dd %>% select(species_name, sp, propU)) %>%
+  left_join(summary_dd %>% dplyr::select(species_name, sp, propU)) %>%
   rename(prop_expected = propU)
 ```
 
@@ -239,7 +236,7 @@ df_targetT <- df_Sper01 %>% filter(Community == "T" &
                           total_count_sample > reads_threshold &
                           !NegControl) %>%
   mutate(prop = obiclean_weight/total_count_sample) %>%
-  left_join(summary_dd %>% select(species_name, sp, propT)) %>%
+  left_join(summary_dd %>% dplyr::select(species_name, sp, propT)) %>%
   rename(prop_expected = propT)
 ```
 
@@ -252,7 +249,7 @@ df_targetG <- df_Sper01 %>% filter(Community == "G" &
                           total_count_sample > reads_threshold &
                           !NegControl) %>%
   mutate(prop = obiclean_weight/total_count_sample) %>%
-  left_join(summary_dd %>% select(species_name, sp, propG)) %>%
+  left_join(summary_dd %>% dplyr::select(species_name, sp, propG)) %>%
   rename(prop_expected = propG)
 ```
 
@@ -320,7 +317,7 @@ then prop_infer(s) = prop_obs(s)/a_s(commuU)
 
 
 ```{r correction mock}
-order_sp <- summary_dd %>% select(species_name, RankG) %>%
+order_sp <- summary_dd %>% dplyr::select(species_name, RankG) %>%
   arrange(-RankG) %>% pull(species_name)
 
 correcU <- df_targetU %>%
@@ -991,13 +988,109 @@ Figure 1 of the manuscript
 
 ```{r saturation models - figure}
 #Figure
+
+# mmec <- cm3
+# mmec$expr <- "Fluo ~ mmec$fct(Cycles, c(M0, Lam, K, c, e))"
+# mmec$fct <- function(x, parm) {
+#   M0 <- parm[1]
+#   Lam <- parm[2]
+#   if (Lam < 0) return(NA)
+#   K <- parm[3]
+#   c <- parm[4]
+#   e <- parm[5]
+#   Fn <- vector(mode = "numeric", length = length(x))
+# 
+#   gamma <- function(x){
+#     2/(1+sqrt(1-4*c^2*x*(1-x)))
+#   }
+#   for (i in 1:length(x)) {
+#     if (i == 1) Fn[i] <- M0
+#     else {
+#       lam <- Lam*c*gamma(Fn[i - 1]/K)*(1-Fn[i - 1]/K)*(e-Fn[i - 1]/K)
+#       if (lam > 1) return(NA)
+#       if (Fn[i - 1] < K){Fn[i] <- Fn[i - 1] * (1 + lam) }
+#       else {Fn[i] <- Fn[i - 1]}
+#     }
+#   }
+#   return(Fn)
+# }
+# mmec$ssFct <- function(x, y) {
+#   ## start estimates
+#   M0 <- 1
+#   Lam <- 1
+#   K <- max(y)
+#   c <- 1
+#   e <- 1
+#   ssVal <- c(M0, Lam, K, c, e)
+#   names(ssVal) <- mlog$parnames
+#   return(ssVal)
+# }
+# mmec$inv <- function(y, parm) {
+#   x <- 1:100
+#   fn <- function(x, parm) mlog$fct(x, parm) - y
+#   uniroot(fn, interval = c(1, 100), parm)$root
+# }
+# mmec$expr.grad <- expression(mlog$fct(Cycles, c(M0, Lam, K, c, e)))
+# mmec$parnames <- c("M0", "Lam", "K", "c", "e")
+# mmec$name <- "mmec"
+# mmec$type <- "my mec"
+
+mlog <- cm3
+mlog$expr <- "Fluo ~ mlog$fct(Cycles, c(M0, Lam, K))"
+mlog$fct <- function(x, parm) {
+  M0 <- parm[1]
+  Lam <- parm[2]
+  K <- parm[3]
+  Fn <- vector(mode = "numeric", length = length(x))
+  for (i in 1:length(x)) {
+    if (i == 1) Fn[i] <- M0
+    else {
+      if (Fn[i - 1] < K){Fn[i] <- Fn[i - 1] * (1 + Lam*(1-Fn[i - 1]/K)) }
+      else {Fn[i] <- Fn[i - 1]}
+    }
+  }
+  return(Fn)
+}
+mlog$ssFct <- function(x, y) {
+  ## start estimates
+  M0 <- 1
+  Lam <- 1
+  K <- max(y)
+  ssVal <- c(M0, Lam, K)
+  names(ssVal) <- mlog$parnames
+  return(ssVal)
+}
+mlog$inv <- function(y, parm) {
+  x <- 1:100
+  fn <- function(x, parm) mlog$fct(x, parm) - y
+  uniroot(fn, interval = c(1, 100), parm)$root
+}
+mlog$expr.grad <- expression(mlog$fct(Cycles, c(M0, Lam, K)))
+mlog$parnames <- c("M0", "Lam", "K")
+mlog$name <- "mlog"
+mlog$type <- "my log"
+
+weights_log <- c(rep(1, 15), rep(50, 5), rep(10, 5),
+                 rep(1, 25), rep(100, 1), rep(0, 10))
+# weights <- c(rep(1, 14), rep(10, 11), rep(1, 26), rep(0, 10))
+
+data_ampli <- as.matrix(ampli[,c("Cycle", "RFU")])
+data_ampli[,1] <- data_ampli[,1] - 1
+
+fitlog <- pcrfit(data_ampli, 1, 2, mlog,
+                 weights = weights_log)
+# fitmec <- pcrfit(ampli, 1, 3, mmec, weights = weights)
+
+res_log <- a*fitlog$m$predict(newdata = fitlog$DATA)+b
+# res_mec <- a*fitmec$m$predict(newdata = fitmec$DATA)+b
+
 ggplot()+
-        geom_point(data = ampli, aes(Cycle, molecules))+
-        geom_line(data = NULL, aes(0:ncycles, plog[,1],
-                                   col = "logistic"),
+        geom_point(data = ampli, aes(Cycle-1, molecules))+
+        geom_line(data = NULL, aes((0:ncycles), res_log,
+                                   col = "Logistic"),
                   linewidth = 0.75)+
-        geom_line(aes(0:ncycles, modele_exp,
-                      col = "None\n(exponential)"),
+        geom_line(aes(0:(ncycles-1), modele_exp[-1],
+                      col = "None\n(Exponential)"),
                   linewidth = 0.75)+
         # geom_line(aes(0:ncycles, pmec[,1],
         #               col = "mechanistic"), linewidth = 0.75)+
