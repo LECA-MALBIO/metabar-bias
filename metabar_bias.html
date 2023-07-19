@@ -549,6 +549,12 @@ barcodes1[barcodes1$species_name ==
   left_join(summary_dd %&gt;% dplyr::select(species_name, sp, propU)) %&gt;%
   rename(prop_expected = propU)</code></pre>
 <pre><code>## Joining with `by = join_by(species_name)`</code></pre>
+<p>Export to Julia to infer efficiencies</p>
+<pre class="r"><code>readsU &lt;- df_targetU %&gt;%
+  dplyr::select(Sample, obiclean_weight, species_name) %&gt;%
+  pivot_wider(names_from = species_name, values_from = obiclean_weight) %&gt;% ungroup %&gt;% dplyr::select(-Sample)
+
+# write_csv(readsU, &quot;data/reads_U.csv&quot;)</code></pre>
 </div>
 <div id="uniform-in-total-dna-community-t" class="section level3">
 <h3>uniform in Total DNA Community (T)</h3>
@@ -927,10 +933,10 @@ res_lm_test %&gt;% group_by(probe) %&gt;% summarise(min = min(slope),
 <pre><code>## # A tibble: 4 × 6
 ##   probe   min   max  lmin  lmax    gap
 ##   &lt;chr&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt;
-## 1 CbeA  -3.39 -3.31 0.970 1.01  0.0367
+## 1 CbeA  -3.39 -3.31 0.972 1.01  0.0353
 ## 2 CbeB  -3.40 -3.34 0.970 0.993 0.0222
 ## 3 Cbp   -3.45 -3.36 0.950 0.986 0.0359
-## 4 Fe    -3.57 -3.45 0.905 0.949 0.0444</code></pre>
+## 4 Fe    -3.57 -3.45 0.905 0.950 0.0447</code></pre>
 <p>###RFU Threshold for each well</p>
 <pre class="r"><code>res_taqman$RFU_Cq &lt;- NA
 

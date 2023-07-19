@@ -65,7 +65,7 @@ function simu_pcrQ(Theta,
                    K = 1e11,
                    seq_rate = 1e4/ mean(K),
                    ncycles = 40,
-                   nreplicate = 1,
+                   nreplicate = size(quantiles, 1),
                    dispersion = 1.,
                    model = "logistic",
                    c = 1.,
@@ -127,6 +127,7 @@ function simu_pcrQ(Theta,
 end
 
 
+
 #Normally approximated simulation:
 function simu_pcr_normalQ(Theta,
     quantiles ;
@@ -134,7 +135,7 @@ function simu_pcr_normalQ(Theta,
     K = 1e11,
     seq_rate = 1e4/ mean(K),
     ncycles = 40,
-    nreplicate = 1,
+    nreplicate = size(quantiles, 1),
     dispersion = 1.,
     model = "logistic",
     c = 1.,
@@ -182,8 +183,7 @@ function simu_pcr_normalQ(Theta,
         kinetics[:,species] .= view(kinetics, :, species).+crea
       end
       broadcast!(+, kin_tot, kin_tot, crea_tot) #update molecules created
-  end
-
+    end
 
   #Sequencing
   for species in 1:nspecies
@@ -222,7 +222,7 @@ function J_Qmetabar(Theta,
   nsim = size(quantiles, 1) #number of simulations to perform by flimo
 
   nreplicate = size(reads_data, 1)
-  nspecies = size(reads_data, 2)
+  #nspecies = size(reads_data, 2)
 
   m0 = Theta .* m0tot #initial quantities at right scale
 
@@ -231,7 +231,7 @@ function J_Qmetabar(Theta,
   
   @inbounds for repl in 1:Int64(floor(nsim/nreplicate))
       #more simulations than replicates needed in this implementation
-      Ksim[(1+(repl-1)*nreplicate):(repl*nreplicate)] .= K
+      Ksim[(1+(repl-1)*nreplicate):(repl*nreplicate)] .= vec(K)
     end
     if Int64(floor(nsim/nreplicate))*nreplicate < nsim
       Ksim[(1+Int64(floor(nsim/nreplicate))*nreplicate):nsim] .= view(K,1:nsim-Int64(floor(nsim/nreplicate))*nreplicate)
@@ -289,14 +289,9 @@ function optim_Qmetabar(reads_data::Array{Float64, 2}, Lambda::Array{Float64, 1}
   nspecies = size(reads_data, 2)
 
   #Estimation of K for the data replicates
-  Ksample = zeros(Float64, nreplicate) 
-  @inbounds for repl in 1:nreplicate
-    Ksample[repl] = sum(view(reads_data, repl, :)) #intermediate value = sum reasd
-  end
+  Ksample = sum(reads_data, dims = 2) #intermediate value = sum reads
   seq_rate = mean(Ksample)/K
-  @inbounds for repl in 1:nreplicate
-    Ksample[repl] = Ksample[repl] / seq_rate
-  end
+  Ksample[:] .= vec(Ksample ./ seq_rate)
 
   pdata = vec(mean(reads_data ./ sum(reads_data, dims = 2), dims = 1)) #average species proportions in data
 
@@ -356,9 +351,9 @@ end
 
 #Change 4 by nspecies+1
 
-reads_dataU = Float64.(Matrix(CSV.read("/Users/sylvainmoi/Documents/These/Projet_QMetabar/Manip/dfSper01U_taq.csv", DataFrame)[:,2:4]))
-reads_dataT = Float64.(Matrix(CSV.read("/Users/sylvainmoi/Documents/These/Projet_QMetabar/Manip/dfSper01T_taq.csv", DataFrame)[:,2:4]))
-reads_dataG = Float64.(Matrix(CSV.read("/Users/sylvainmoi/Documents/These/Projet_QMetabar/Manip/dfSper01G_taq.csv", DataFrame)[:,2:4]))
+reads_dataU = Float64.(Matrix(CSV.read("data/dfSper01U_taq.csv", DataFrame)[:,2:4]))
+reads_dataT = Float64.(Matrix(CSV.read("data/dfSper01T_taq.csv", DataFrame)[:,2:4]))
+reads_dataG = Float64.(Matrix(CSV.read("data/dfSper01G_taq.csv", DataFrame)[:,2:4]))
 
 mean(reads_dataU ./ sum(reads_dataU, dims = 2), dims = 1)
 mean(reads_dataT ./ sum(reads_dataT, dims = 2), dims = 1)
@@ -367,7 +362,7 @@ mean(reads_dataG ./ sum(reads_dataG, dims = 2), dims = 1)
 ## Define Lambda
 Lambda = [mean([0.972, 0.947]), 0.989, 0.940]
 
-Lambda_hybrid = mean(Lambda)
+#Lambda_hybrid = mean(Lambda)
 
 #Define K
 K = 7.57e12
@@ -602,9 +597,9 @@ mean(reads_dataG ./ sum(reads_dataG, dims = 2), dims = 1)
 Lambda_hybrid = mean(Lambda)
 Lambda_complete = vcat(Lambda, Lambda_hybrid)
 
-reads_dataU_complete = Float64.(Matrix(CSV.read("/Users/sylvainmoi/Documents/These/Projet_QMetabar/Manip/dfSper01U_taq_complete.csv", DataFrame)[:,2:5]))
-reads_dataT_complete = Float64.(Matrix(CSV.read("/Users/sylvainmoi/Documents/These/Projet_QMetabar/Manip/dfSper01T_taq_complete.csv", DataFrame)[:,2:5]))
-reads_dataG_complete = Float64.(Matrix(CSV.read("/Users/sylvainmoi/Documents/These/Projet_QMetabar/Manip/dfSper01G_taq_complete.csv", DataFrame)[:,2:5]))
+reads_dataU_complete = Float64.(Matrix(CSV.read("data/dfSper01U_taq_complete.csv", DataFrame)[:,2:5]))
+reads_dataT_complete = Float64.(Matrix(CSV.read("data/dfSper01T_taq_complete.csv", DataFrame)[:,2:5]))
+reads_dataG_complete = Float64.(Matrix(CSV.read("data/dfSper01G_taq_complete.csv", DataFrame)[:,2:5]))
 
 
 #_____

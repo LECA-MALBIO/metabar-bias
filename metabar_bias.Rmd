@@ -227,6 +227,31 @@ df_targetU <- df_Sper01 %>% filter(Community == "U" &
   rename(prop_expected = propU)
 ```
 
+Export to Julia to infer efficiencies
+
+```{r}
+readsU <- df_targetU %>%
+  dplyr::select(Sample, obiclean_weight, species_name) %>%
+  pivot_wider(names_from = species_name, values_from = obiclean_weight) %>% ungroup %>% dplyr::select(-Sample)
+
+# write_csv(readsU, "data/reads_U.csv")
+
+readsT <- df_targetT %>%
+  dplyr::select(Sample, obiclean_weight, species_name) %>%
+  pivot_wider(names_from = species_name, values_from = obiclean_weight) %>% ungroup %>% dplyr::select(-Sample)
+
+# write_csv(readsT, "data/reads_T.csv")
+
+readsG <- df_targetG %>%
+  dplyr::select(Sample, obiclean_weight, species_name) %>%
+  pivot_wider(names_from = species_name,
+              values_from = obiclean_weight,
+              values_fill = 0) %>% ungroup %>% dplyr::select(-Sample)
+
+# write_csv(readsG, "data/reads_G.csv")
+```
+
+
 ### uniform in Total DNA Community (T)
 
 ```{r analysis T}
@@ -819,44 +844,74 @@ simu_pcr <- function(cycles = ncycles,
   return(kinetics)
 }
 
-#infer best parameters with logistic model
-fcrit_logistic <- function(par,
-                           data = NULL,
-                           K = 1e11,
-                           low_cycle = 20, high_cycle = 40){
-  m0 <- 10^par[1]
-  lam <- par[2]
-  set.seed(123456) #fix randomness
-  p <- simu_pcr(m0=m0, lambda=lam, 
-                  K=K,
-                  cycles = ncycles, approxN = T)
-  crit <- sum(((p[low_cycle:high_cycle+1]-
-                  data$molecules[low_cycle:high_cycle])/
-                    data$molecules[low_cycle:high_cycle])^2)
-  crit <- crit * (1+2e1*abs(max(p)-K)/K)
-  return(crit)
+simu_metabar <- function(cycles = ncycles,
+                       m0=1,
+                       lambda=1,
+                       K=Inf,
+                       satu = "linear",
+                       c = 1,
+                       e = 1,
+                       delta = 1,
+                       approxN = F,
+                       d = 5e-9){
+  kinetics_pcr <- simu_pcr(cycles = cycles,
+                       m0=m0,
+                       lambda=lambda,
+                       K=K,
+                       satu = satu,
+                       c = c,
+                       e = e,
+                       delta = delta,
+                       approxN = approxN)
+  amplicons <- kinetics_pcr[nrow(kinetics_pcr),]
+  #Sequencing
+  if (approxN){
+    reads <- rnorm(length(amplicons), mean = amplicons*d,
+                   sd = sqrt(d*amplicons*(1-amplicons/K)))
+  } else {
+    reads <- rbinom(length(amplicons), floor(K*d), amplicons/K)
+  }
+  reads
 }
 
-#infer best parameters with mechanistic model
-fcrit_mechanistic <- function(par,
-                             data = NULL, K = 1e11,
-                             low_cycle = 20, high_cycle = 40){
-  m0 <- 10^par[1]
-  lam <- par[2]
-  c <- par[3]
-  e <- par[4]
-  
-  set.seed(123456) #Fix randomness
-  p <- simu_pcr(m0=m0,lambda=lam,
-                  K=K,
-                  satu ="",
-                  cycles = ncycles, c = c, e = e,
-                  approxN = T)
-  crit <- sum(((p[low_cycle:high_cycle+1]-data$molecules[low_cycle:high_cycle])/
-                 data$molecules[low_cycle:high_cycle])^2)
-  crit <- crit * (1+2e1*abs(max(p)-K)/K)
-  return(crit)
-}
+#infer best parameters with logistic model
+# fcrit_logistic <- function(par,
+#                            data = NULL,
+#                            K = 1e11,
+#                            low_cycle = 20, high_cycle = 40){
+#   m0 <- 10^par[1]
+#   lam <- par[2]
+#   set.seed(123456) #fix randomness
+#   p <- simu_pcr(m0=m0, lambda=lam, 
+#                   K=K,
+#                   cycles = ncycles, approxN = T)
+#   crit <- sum(((p[low_cycle:high_cycle+1]-
+#                   data$molecules[low_cycle:high_cycle])/
+#                     data$molecules[low_cycle:high_cycle])^2)
+#   crit <- crit * (1+2e1*abs(max(p)-K)/K)
+#   return(crit)
+# }
+# 
+# #infer best parameters with mechanistic model
+# fcrit_mechanistic <- function(par,
+#                              data = NULL, K = 1e11,
+#                              low_cycle = 20, high_cycle = 40){
+#   m0 <- 10^par[1]
+#   lam <- par[2]
+#   c <- par[3]
+#   e <- par[4]
+#   
+#   set.seed(123456) #Fix randomness
+#   p <- simu_pcr(m0=m0,lambda=lam,
+#                   K=K,
+#                   satu ="",
+#                   cycles = ncycles, c = c, e = e,
+#                   approxN = T)
+#   crit <- sum(((p[low_cycle:high_cycle+1]-data$molecules[low_cycle:high_cycle])/
+#                  data$molecules[low_cycle:high_cycle])^2)
+#   crit <- crit * (1+2e1*abs(max(p)-K)/K)
+#   return(crit)
+# }
 
 #Best fit exponential model
 fcrit_exp <- function(par,
@@ -899,86 +954,86 @@ Parameters are fitted numerically. No biological consideration.
 
 KWell <- max(ampli$molecules)
 
-low_cycle <- high_cycle
-
-while ((ampli %>%
-       pull(molecules))[low_cycle] > Mct){
-    low_cycle <- low_cycle -1
-  }
-low_cycle <- low_cycle +1
-
-
-#Fit logistic model
-opt_log <- optim(c(5, 0.6), fcrit_logistic,
-                   data = ampli,
-                   K = KWell,
-                   low_cycle= low_cycle,
-                   high_cycle = high_cycle,
-                   lower = c(1, 0.3), upper = c(10, 1),
-                   method = "L-BFGS-B")
-  
-m0log <- opt_log$par[1]
-lamlog <- opt_log$par[2]
-  
-#Fit mechanistic model
-#First step
-
-opt_mec <- optim(c(5.75, 0.55,  0.75, 1.15),
-                   fcrit_mechanistic,
-                   data = ampli,
-                   K = KWell,
-                   low_cycle= low_cycle, high_cycle = high_cycle,
-                   lower = c(1, 0.4, 0.5, 0.8),
-                   upper = c(10, 0.7, 1, 1.4),
-                   method = "L-BFGS-B")
-  
-m0mec <- opt_mec$par[1]
-lammec <- opt_mec$par[2]
-cmec <- opt_mec$par[3]
-emec <- opt_mec$par[4]
-
-#Second step, fixed e
-
-opt_mec <- optim(c(5.75, 0.55,  0.75, emec),
-                   fcrit_mechanistic,
-                   data = ampli,
-                   K = KWell,
-                   low_cycle= low_cycle, high_cycle = high_cycle,
-                   lower = c(1, 0.4, 0.5, emec*0.99),
-                   upper = c(10, 1/emec*0.99, 1, emec*1.01),
-                   method = "L-BFGS-B")
-  
-m0mec <- opt_mec$par[1]
-lammec <- opt_mec$par[2]
-cmec <- opt_mec$par[3]
-emec <- opt_mec$par[4]
-
-#Fit exponential model
-
-opt_exp <- optim(c(5.75, 0.55),
-                   fcrit_exp,
-                   data = ampli,
-                   K = KWell,
-                   low_cycle= low_cycle,
-                 high_cycle = 24,
-                   lower = c(1, 0.4),
-                   upper = c(10, 0.9),
-                   method = "L-BFGS-B")
-
-#Simulate PCR
-#Logistic model
-plog <- simu_pcr(m0=10^m0log,
-                   lambda=lamlog,
-                   K=KWell,  
-                   cycles = ncycles)
-
-#Mechanistic model
-pmec <- simu_pcr(m0=10^m0mec,
-                   lambda=lammec,
-                   K=KWell,
-                   satu ="", cycles = ncycles,
-                   e = emec,
-                   c = cmec)
+# low_cycle <- high_cycle
+# 
+# while ((ampli %>%
+#        pull(molecules))[low_cycle] > Mct){
+#     low_cycle <- low_cycle -1
+#   }
+# low_cycle <- low_cycle +1
+# 
+# 
+# #Fit logistic model
+# opt_log <- optim(c(5, 0.6), fcrit_logistic,
+#                    data = ampli,
+#                    K = KWell,
+#                    low_cycle= low_cycle,
+#                    high_cycle = high_cycle,
+#                    lower = c(1, 0.3), upper = c(10, 1),
+#                    method = "L-BFGS-B")
+#   
+# m0log <- opt_log$par[1]
+# lamlog <- opt_log$par[2]
+#   
+# #Fit mechanistic model
+# #First step
+# 
+# opt_mec <- optim(c(5.75, 0.55,  0.75, 1.15),
+#                    fcrit_mechanistic,
+#                    data = ampli,
+#                    K = KWell,
+#                    low_cycle= low_cycle, high_cycle = high_cycle,
+#                    lower = c(1, 0.4, 0.5, 0.8),
+#                    upper = c(10, 0.7, 1, 1.4),
+#                    method = "L-BFGS-B")
+#   
+# m0mec <- opt_mec$par[1]
+# lammec <- opt_mec$par[2]
+# cmec <- opt_mec$par[3]
+# emec <- opt_mec$par[4]
+# 
+# #Second step, fixed e
+# 
+# opt_mec <- optim(c(5.75, 0.55,  0.75, emec),
+#                    fcrit_mechanistic,
+#                    data = ampli,
+#                    K = KWell,
+#                    low_cycle= low_cycle, high_cycle = high_cycle,
+#                    lower = c(1, 0.4, 0.5, emec*0.99),
+#                    upper = c(10, 1/emec*0.99, 1, emec*1.01),
+#                    method = "L-BFGS-B")
+#   
+# m0mec <- opt_mec$par[1]
+# lammec <- opt_mec$par[2]
+# cmec <- opt_mec$par[3]
+# emec <- opt_mec$par[4]
+# 
+# #Fit exponential model
+# 
+# opt_exp <- optim(c(5.75, 0.55),
+#                    fcrit_exp,
+#                    data = ampli,
+#                    K = KWell,
+#                    low_cycle= low_cycle,
+#                  high_cycle = 24,
+#                    lower = c(1, 0.4),
+#                    upper = c(10, 0.9),
+#                    method = "L-BFGS-B")
+# 
+# #Simulate PCR
+# #Logistic model
+# plog <- simu_pcr(m0=10^m0log,
+#                    lambda=lamlog,
+#                    K=KWell,  
+#                    cycles = ncycles)
+# 
+# #Mechanistic model
+# pmec <- simu_pcr(m0=10^m0mec,
+#                    lambda=lammec,
+#                    K=KWell,
+#                    satu ="", cycles = ncycles,
+#                    e = emec,
+#                    c = cmec)
 
 #Exponential model
 modele_exp <- 10^opt_exp$par[1]*(1+opt_exp$par[2])^seq(0:ncycles)
@@ -1150,4 +1205,229 @@ ggplot()+
 #        height = 120, width = 180, device = "pdf", dpi = 600)
 
 ```
+
+## Estimated efficiencies
+
+```{r efficiencies}
+efficiencies <- read_csv("data/efficiencies_U.csv")
+colnames(efficiencies) <- colnames(readsU)
+
+efficiencies <- cbind(data.frame(group = efficiencies[,1]), efficiencies)
+colnames(efficiencies)[1] <- "lambda_max"
+
+df_eff <- efficiencies %>% pivot_longer(-1, names_to = "species_name",
+                                        values_to = "lambda") %>%
+  left_join(summary_dd %>% dplyr::select(species_name, sp))
+
+
+ggplot(df_eff)+
+  geom_point(aes(factor(sp, levels = order_short, ordered = T),
+                 lambda/lambda_max, col = lambda_max))+
+  geom_hline(yintercept = mean(df_eff$lambda/df_eff$lambda_max))
+
+
+df_eff %>% group_by(lambda_max) %>% summarise((max(lambda)-min(lambda))/max(lambda))
+
+summary_dd$lambda <- NULL
+summary_dd$lambda_max <- NULL
+summary_dd <- summary_dd %>% left_join(df_eff %>%
+                  filter(lambda_max == 0.9))
+
+```
+
+```{r simu}
+nsim <- 100
+
+#U
+mat_propU <- matrix(ncol = nrow(summary_dd), nrow = nsim)
+for (i in 1:nsim){
+  reads_simu <- simu_metabar(cycles = 40,
+         m0 = summary_dd$molecules_U*VDNA_metab,
+         lambda = summary_dd$lambda,
+         K = K)
+
+  mat_propU[i,] <- reads_simu/sum(reads_simu)
+}
+
+summary_dd$prop_simuU <- apply(mat_propU,2,median)
+
+#T
+mat_propT <- matrix(ncol = nrow(summary_dd), nrow = nsim)
+for (i in 1:nsim){
+  reads_simu <- simu_metabar(cycles = 40,
+         m0 = summary_dd$molecules_T*VDNA_metab,
+         lambda = summary_dd$lambda,
+         K = K)
+
+  mat_propT[i,] <- reads_simu/sum(reads_simu)
+}
+
+summary_dd$prop_simuT <- apply(mat_propT,2,median)
+
+#G
+mat_propG <- matrix(ncol = nrow(summary_dd), nrow = nsim)
+for (i in 1:nsim){
+  reads_simu <- simu_metabar(cycles = 40,
+         m0 = summary_dd$molecules_G*VDNA_metab,
+         lambda = summary_dd$lambda,
+         K = K)
+
+  mat_propG[i,] <- reads_simu/sum(reads_simu)
+}
+
+summary_dd$prop_simuG <- apply(mat_propG,2,median)
+
+summary_dd <- summary_dd %>% left_join(correcU) %>%
+  rename(correc_mock = correc)
+
+ggplot(summary_dd)+
+  geom_point(aes(lambda, correc_mock))
+
+ggplot(summary_dd)+
+  geom_point(aes((1+lambda)^26, correc_mock))
+
+cor(summary_dd$lambda, summary_dd$correc_mock)
+cor((1+summary_dd$lambda)^26, summary_dd$correc_mock)
+```
+
+Load inferred proportions
+
+```{r inferred prop}
+
+df_inferU <- read_csv("data/prop_inferU.csv")
+df_inferT <- read_csv("data/prop_inferT.csv")
+df_inferG <- read_csv("data/prop_inferG.csv")
+
+colnames(df_inferU) <- colnames(readsU)
+colnames(df_inferT) <- colnames(readsU)
+colnames(df_inferG) <- colnames(readsU)
+
+summary_dd <- summary_dd %>% left_join(
+  df_inferU %>% pivot_longer(1:13, names_to = "species_name",
+                           values_to = "prop_inferU"))
+
+summary_dd <- summary_dd %>% left_join(
+  df_inferT %>% pivot_longer(1:13, names_to = "species_name",
+                           values_to = "prop_inferT"))
+
+summary_dd <- summary_dd %>% left_join(
+  df_inferG %>% pivot_longer(1:13, names_to = "species_name",
+                           values_to = "prop_inferG"))
+
+```
+
+
+New plots
+
+```{r}
+gobsU <- ggplot(df_targetU)+
+  geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
+                   prop))+
+  # theme(axis.text.x=element_blank())+
+  ggtitle("Uniform community")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  labs(y = "", x = "")+
+  geom_hline(yintercept = 1/nrow(summary_dd),
+             color = "gold")+
+  geom_point(data = summary_dd, aes(sp, prop_inferU), col = "red")
+
+gobsT <- ggplot(df_targetT)+
+  geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
+                   prop))+
+  # theme(axis.text.x=element_blank())+
+  ggtitle("Uniform in Total DNA community")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  labs(y = "", x = "", fill = "")+
+  geom_point(data = summary_dd,
+             aes(sp, propT, fill = "Expected"),
+             shape = 23,
+             size = 3)+
+  geom_hline(yintercept = 1/nrow(summary_dd),
+             color = "gold", linetype = "dashed")+
+  scale_fill_manual(values = colp)+
+  geom_point(data = summary_dd, aes(sp, prop_inferT), col = "red")
+
+gobsG <- ggplot(df_targetG)+
+  geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
+                   prop))+
+  labs(y = "", x = "")+
+  ggtitle("Geometric community")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  geom_point(data = summary_dd,
+             aes(sp, propG), shape = 23,
+             fill = "gold", size = 3)+
+  scale_y_log10()+
+  scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))+
+  theme(axis.text.x=element_markdown())+
+  geom_point(data = summary_dd, aes(sp, prop_inferG), col = "red")
+
+gobsU+
+  geom_point(data = summary_dd, aes(sp, prop_simuU), col = "red")
+
+gobsT+
+  geom_point(data = summary_dd, aes(sp, prop_simuT), col = "red")
+
+gobsG+
+  geom_point(data = summary_dd, aes(sp, prop_simuG), col = "red")
+
+ginferG <- ggplot(df_targetG)+
+  geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
+                   prop_infer_mock))+
+  geom_point(data = df_targetG %>% group_by(sp) %>%
+               summarise(prop = median(prop)),
+             aes(sp, prop, fill = "Observed\n(Median)"),
+             shape = 21, size = 3)+
+  labs(y = "", x = "",
+       fill = "", col = "")+
+  geom_point(data = summary_dd,
+             aes(sp, propG, fill = "Expected"), shape = 23,
+             size = 3)+
+  scale_fill_manual(values = colp)+
+  ggtitle("Geometric community")+
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "none")+
+  scale_y_log10()+
+  scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))+
+  theme(axis.text.x=element_markdown())+
+  geom_point(data = summary_dd, aes(sp, prop_inferG),
+             col = "cyan")
+
+ginferG
+
+
+
+summary_dd %>% filter(sp %in% c("Cbe", "Cbp", "Fe")) %>%
+  dplyr::select(propU)
+
+df_targetU %>% group_by(sp) %>%
+               summarise(prop = median(prop)) %>%
+  filter(sp %in% c("Cbe", "Cbp", "Fe")) %>% pull(prop) %>%
+  sum()
+
+dfaux <- data.frame(sp = c("Cbe", "Cbp", "Fe"),
+                    propinferU = c(0.346, 0.308, 0.346),
+                    propinferG = c(0.0288, 0.122, 0.849))
+dfaux$propinferU <- dfaux$propinferU * df_targetU %>%
+  group_by(sp) %>%
+               summarise(prop = median(prop)) %>%
+  filter(sp %in% c("Cbe", "Cbp", "Fe")) %>% pull(prop) %>%
+  sum()
+dfaux$propinferG <- dfaux$propinferG * df_targetG %>%
+  group_by(sp) %>%
+               summarise(prop = median(prop)) %>%
+  filter(sp %in% c("Cbe", "Cbp", "Fe")) %>% pull(prop) %>%
+  sum()
+
+gobsU +
+  geom_point(data = dfaux, aes(sp, propinferU), col = "cyan")
+
+gobsG +
+  geom_point(data = dfaux, aes(sp, propinferG), col = "cyan")
+
+```
+
+
+
+
+
 
