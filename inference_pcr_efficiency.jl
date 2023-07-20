@@ -141,13 +141,24 @@ function J_efficiencies(Theta,
     #  cin_tot = sum(view(kinetics, sim, :))
     #  kinetics[sim,:] .= view(kinetics, sim,:)./cin_tot #Relative abundance
     #end
-    score = zero(eltype(Theta))
 
-    @inbounds for repl in 1:nreplicate
-        pdata = view(reads_data, repl, :) ./ sum(view(reads_data, repl, :))
-        psimu = vec(mean(view(kinetics, (1+(repl-1)*nsimr):(repl*nsimr), :), dims = 1))
-        score = score + sum((psimu .- pdata).^2. ./ pdata)
+    @inbounds for sim in 1:nsim #Number of molecules for each simulation
+        cin_tot = sum(view(kinetics, sim, :))
+        kinetics[sim,:] .= view(kinetics, sim,:)./cin_tot #Relative abundance
       end
+      
+      psimu = vec(mean(kinetics, dims = 1))
+      psimu[:] .= psimu ./ sum(psimu)
+      
+      score = sum(((psimu .- pdata).^2. ./ pdata))
+
+    #score = zero(eltype(Theta))
+
+    #@inbounds for repl in 1:nreplicate
+    #    pdata = view(reads_data, repl, :) ./ sum(view(reads_data, repl, :))
+    #    psimu = vec(mean(view(kinetics, (1+(repl-1)*nsimr):(repl*nsimr), :), dims = 1))
+    #   score = score + sum((psimu .- pdata).^2. ./ pdata)
+    #  end
     
   return score
 end
@@ -165,7 +176,7 @@ function optim_efficiencies(reads_data::Array{Float64, 2}, m0::Array{Float64, 1}
     model = "logistic",
     c = 1.,
     e = 1.,
-    lambda_max = 0.9,
+    lambda_max = 1.,
     quantiles = nothing)
   
     #reads_data: 2D array. Rows = replicates, Col = species
@@ -178,7 +189,7 @@ function optim_efficiencies(reads_data::Array{Float64, 2}, m0::Array{Float64, 1}
   
     #pdata = vec(mean(reads_data ./ sum(reads_data, dims = 2), dims = 1)) #average species proportions in data
     if (isnothing(Theta0))
-      Theta0 = fill(lambda_max, nspecies-1)
+      Theta0 = fill(lambda_max*0.999, nspecies-1)
     end
     obj = (Theta, quantiles) -> J_efficiencies(Theta, quantiles,
                                           reads_data = reads_data,
@@ -197,7 +208,7 @@ function optim_efficiencies(reads_data::Array{Float64, 2}, m0::Array{Float64, 1}
                        nsim = nsim,
                        ninfer = 1,
                        lower = fill(0.5, nspecies-1),
-                       upper = fill(1., nspecies-1),
+                       upper = fill(lambda_max*0.9999, nspecies-1),
                        AD = true,
                        Theta0 = Theta0,
                        randomTheta0 = false,
@@ -238,6 +249,10 @@ optU_eff = optim_efficiencies(reads_U, qty_init_U,
 
 optU_eff.minimizer
 optU_eff.minimum
+optU_eff.time
+
+res_lambda = vcat(1, vec(optU_eff.minimizer))
+# CSV.write("data/efficiencies_U.csv", Tables.table(res_lambda))
 
 simU = simu_pcr_normalQ_eff(vcat(0.9, vec(optU_eff.minimizer)),
     rand(190, 13*62),
@@ -249,50 +264,59 @@ simU = simu_pcr_normalQ_eff(vcat(0.9, vec(optU_eff.minimizer)),
 mean(simU, dims = 1) ./ sum(mean(simU, dims = 1))
 mean(reads_U, dims = 1) ./ sum(mean(reads_U, dims = 1))
 
-Lambda
-optU_eff.minimizer[[9, 7, 8]]
+Lambda #Cbe, Cbp, Fe
+optU_eff.minimizer[[8, 6, 7]] #Cbe, Cbp, Fe
 
-Lambda ./ optU_eff.minimizer[[9, 7, 8]]
-
-mean(reads_U, dims = 1) ./ sum(mean(reads_U, dims = 1)) ./ (1 .+ optU_eff.minimizer).^20
-
-sum(reads_U, dims = 1)
-
-##Serial inference for different values of lambda_max
-
-Lambda_max = vcat((0.7:0.05:0.95), 0.999)
-
-res_lambda = zeros(length(Lambda_max), 13)
-scores = zeros(length(Lambda_max))
-i = 1
-
-nsim2 = 190
-Q = rand(nsim2, 13*42)
-
-for lambda_max in Lambda_max
-    println(lambda_max)
-    optU_eff = optim_efficiencies(reads_U, qty_init_U,
-    ncycles = 40,
-    K = K,
-    dispersion = 1.,
-    nsim = nsim2,
-    lambda_max = lambda_max,
-    quantiles = Q)
-    res_lambda[i,:] .= vcat(lambda_max, vec(optU_eff.minimizer))
-    scores[i] = optU_eff.minimum[1]
-    i = i + 1
-end
-
-scores
-res_lambda
-
-# CSV.write("data/efficiencies_U.csv", Tables.table(res_lambda))
+Lambda ./ optU_eff.minimizer[[8, 6, 7]]
 
 
-res_lambda[:,[9, 7, 8]]
-Lambda
+0.972/optU_eff.minimizer[[8]] #CbeA
+0.947/optU_eff.minimizer[[8]] #CbeB
 
-res_lambda ./ res_lambda[:,1]
+
+## Inference for communities T and G with inferred Lambdas
+##____________________________________________________________________________________________________
+
+Lambda_infer = vcat(0.9, vec(optU_eff.minimizer))
+
+reads_T = Float64.(Matrix(CSV.read("data/reads_T.csv", DataFrame)))
+reads_G = Float64.(Matrix(CSV.read("data/reads_G.csv", DataFrame)))
+
+optU_full = optim_Qmetabar(reads_U, Lambda_infer,
+  m0tot = 1e5,
+  ncycles = 40,
+  K = K,
+  dispersion = 1.,
+  nsim = 190)
+
+optU_full.minimizer ./ sum(optU_full.minimizer)
+mean(reads_U ./ sum(reads_U, dims = 2), dims = 1)
+
+optT_full = optim_Qmetabar(reads_T, Lambda_infer,
+  m0tot = 1e5,
+  ncycles = 40,
+  K = K,
+  dispersion = 1.,
+  nsim = 190)
+
+optT_full.minimizer ./ sum(optT_full.minimizer)
+mean(reads_T ./ sum(reads_T, dims = 2), dims = 1)
+
+
+optG_full = optim_Qmetabar(reads_G, Lambda_infer,
+  m0tot = 1e5,
+  ncycles = 40,
+  K = K,
+  dispersion = 1.,
+  nsim = 190)
+
+optG_full.minimizer ./ sum(optG_full.minimizer)
+mean(reads_G ./ sum(reads_G, dims = 2), dims = 1)
+
+CSV.write("data/prop_inferU.csv", Tables.table(optU_full.minimizer ./ sum(optU_full.minimizer)))
+CSV.write("data/prop_inferT.csv", Tables.table(optT_full.minimizer ./ sum(optT_full.minimizer)))
+CSV.write("data/prop_inferG.csv", Tables.table(optG_full.minimizer ./ sum(optG_full.minimizer)))
+
 ## Tests
 ##____________________________________________________________________________________________________
 
@@ -310,3 +334,47 @@ println(repl)
 println(typeof(pdata))
 println(typeof(psimu))
 println(((psimu .- pdata).^2. ./ pdata))
+
+
+
+##Serial inference for different values of lambda_max
+
+Lambda_max = vcat((0.7:0.05:0.95), 0.999)
+
+res_lambda = zeros(length(Lambda_max), 13)
+scores = zeros(length(Lambda_max))
+i = 1
+
+nsim2 = 190
+Q = rand(nsim2, 13*42)
+
+for lambda_max in Lambda_max
+    println(lambda_max)
+    optU_eff2 = optim_efficiencies(reads_U, qty_init_U,
+    ncycles = 40,
+    K = K,
+    dispersion = 1.,
+    nsim = nsim2,
+    lambda_max = lambda_max,
+    quantiles = Q)
+    res_lambda[i,:] .= vcat(lambda_max, vec(optU_eff2.minimizer))
+    scores[i] = optU_eff2.minimum[1]
+    i = i + 1
+end
+
+scores
+res_lambda
+
+# CSV.write("data/efficiencies_U.csv", Tables.table(res_lambda))
+
+
+#mean(reads_U, dims = 1) ./ sum(mean(reads_U, dims = 1)) ./ (1 .+ optU_eff.minimizer).^26
+
+sum(reads_U, dims = 1)
+
+
+
+res_lambda[:,[9, 7, 8]]
+Lambda
+
+res_lambda ./ res_lambda[:,1]
