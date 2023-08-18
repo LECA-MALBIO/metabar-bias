@@ -192,11 +192,15 @@ summary_sample <- df_Sper01 %>%
 summary(summary_sample$total_count_sample)
 summary(summary_sample %>%
           filter(!NegControl) %>% pull(total_count_sample))
+sd(summary_sample %>%
+          filter(!NegControl) %>% pull(total_count_sample))
 
 reads_threshold <- 5000
 
-ggplot(summary_sample)+
-  geom_point(aes(x = 1:nrow(summary_sample),
+ggplot(summary_sample %>%
+          filter(!NegControl))+
+  geom_point(aes(x = 1:nrow(summary_sample %>%
+          filter(!NegControl)),
                  y = total_count_sample,
                  shape = Community))+
   labs(col = "Spike_level")+
@@ -530,6 +534,7 @@ cq <- read.csv2("data/SPER01_Cq_res.csv")
 cq <- cq[cq$Fluor == "FAM",c("Well", "Fluor", "Cq")]
 
 taqman <- read_csv("data/taqman.csv")
+taqman[taqman$sp == "Fe","sp"] <- "Fex"
 
 cinetique <- ampli %>%
   pivot_longer(!Cycle, names_to = "Well",
@@ -538,12 +543,12 @@ cinetique <- ampli %>%
 cinetique$Dilu <- match(substr(cinetique$Well, 1, 1), LETTERS)
 cinetique$Repli <- as.integer(substr(cinetique$Well, 2, nchar(cinetique$Well)))
 
-cinetique$probe <- "Fe"
+cinetique$probe <- "Fex"
 cinetique[cinetique$Repli <= 9, "probe"] <- "Cbp" 
 cinetique[cinetique$Repli <= 6, "probe"] <- "CbeB"
 cinetique[cinetique$Repli <= 3, "probe"] <- "CbeA"
 
-cinetique$sp <- "Fe"
+cinetique$sp <- "Fex"
 cinetique[cinetique$Repli <= 9, "sp"] <- "Cbp" 
 cinetique[cinetique$Repli <= 6, "sp"] <- "Cbe"
 cinetique[cinetique$Repli <= 3, "sp"] <- "Cbe"
@@ -556,12 +561,12 @@ res_taqman <- cq %>% left_join(endpoint)
 res_taqman$Dilu <- match(substr(res_taqman$Well, 1, 1), LETTERS)
 res_taqman$Repli <- as.integer(substr(res_taqman$Well, 2, nchar(res_taqman$Well)))
 
-res_taqman$probe <- "Fe"
+res_taqman$probe <- "Fex"
 res_taqman[res_taqman$Repli <= 9, "probe"] <- "Cbp" 
 res_taqman[res_taqman$Repli <= 6, "probe"] <- "CbeB"
 res_taqman[res_taqman$Repli <= 3, "probe"] <- "CbeA"
 
-res_taqman$sp <- "Fe"
+res_taqman$sp <- "Fex"
 res_taqman[res_taqman$Repli <= 9, "sp"] <- "Cbp" 
 res_taqman[res_taqman$Repli <= 6, "sp"] <- "Cbe"
 res_taqman[res_taqman$Repli <= 3, "sp"] <- "Cbe"
@@ -1097,7 +1102,7 @@ prop2 <- df_targetU %>% group_by(sp) %>%
 ggplot()+
     geom_line(aes(lam1/Lam2-1, res[,1]/(rowSums(res)), col = "Rosa canina"))+
   geom_line(aes(lam1/Lam2-1, res[,2]/(rowSums(res)), col = "other"))+
-  ggtitle("Mock community with two species\nwith equal starting quantities")+
+  ggtitle("Simulated mock communities of two species\nwith equal starting quantities")+
   geom_hline(yintercept = 0.5, linetype = "dashed")+
   theme(plot.title = element_text(hjust = 0.5))+
   labs(x = "Relative variation of PCR efficiency", y = "Final relative abundances", col = "Species")+

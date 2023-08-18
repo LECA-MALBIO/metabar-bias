@@ -406,37 +406,37 @@ dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;01&quot;,]$Sample &lt;- 100
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;01&quot;,]$sp &lt;- &quot;Spk1&quot;
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;02&quot;,]$Sample &lt;- 14
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;02&quot;,]$sp &lt;- &quot;Pa&quot;
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;02&quot;,]$sp &lt;- &quot;Pab&quot;
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;03&quot;,]$Sample &lt;- 16
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;03&quot;,]$sp &lt;- &quot;Lx&quot;
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;03&quot;,]$sp &lt;- &quot;Lxy&quot;
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;04&quot;,]$Sample &lt;- 18
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;04&quot;,]$sp &lt;- &quot;Aa&quot;
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;04&quot;,]$sp &lt;- &quot;Aal&quot;
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;05&quot;,]$Sample &lt;- 20
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;05&quot;,]$sp &lt;- &quot;Ac&quot;
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;05&quot;,]$sp &lt;- &quot;Aca&quot;
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;06&quot;,]$Sample &lt;- 22
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;06&quot;,]$sp &lt;- &quot;Bm&quot;
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;06&quot;,]$sp &lt;- &quot;Bme&quot;
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;07&quot;,]$Sample &lt;- -1
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;07&quot;,]$sp &lt;- &quot;Neg&quot;
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;08&quot;,]$Sample &lt;- 24
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;08&quot;,]$sp &lt;- &quot;Rc&quot;
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;08&quot;,]$sp &lt;- &quot;Rca&quot;
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;09&quot;,]$Sample &lt;- 26
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;09&quot;,]$sp &lt;- &quot;Cbp&quot;
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;10&quot;,]$Sample &lt;- 28
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;10&quot;,]$sp &lt;- &quot;Gr&quot;
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;10&quot;,]$sp &lt;- &quot;Gro&quot;
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;11&quot;,]$Sample &lt;- 30
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;11&quot;,]$sp &lt;- &quot;Rf&quot;
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;11&quot;,]$sp &lt;- &quot;Rfe&quot;
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;12&quot;,]$Sample &lt;- 32
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;12&quot;,]$sp &lt;- &quot;Lc&quot;
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == &quot;12&quot;,]$sp &lt;- &quot;Lco&quot;
 
 #Corrections
 
@@ -444,16 +444,16 @@ dataddpcr1[dataddpcr1$Well %in% c(&quot;H07&quot;),]$Sample &lt;- 100
 dataddpcr1[dataddpcr1$Well %in% c(&quot;H07&quot;),]$sp &lt;- &quot;Spk1&quot;
 
 dataddpcr1[dataddpcr1$Well %in% c(&quot;H06&quot;),]$Sample &lt;- 20
-dataddpcr1[dataddpcr1$Well %in% c(&quot;H06&quot;),]$sp &lt;- &quot;Ac&quot;
+dataddpcr1[dataddpcr1$Well %in% c(&quot;H06&quot;),]$sp &lt;- &quot;Aca&quot;
 
 dataddpcr1[dataddpcr1$Well %in% c(&quot;H01&quot;, &quot;A12&quot;, &quot;B12&quot;),]$Sample &lt;- -1
 dataddpcr1[dataddpcr1$Well %in% c(&quot;H01&quot;, &quot;A12&quot;, &quot;B12&quot;),]$sp &lt;- &quot;Neg&quot;
 
 dataddpcr1[dataddpcr1$Well %in% c(&quot;H05&quot;),]$Sample &lt;- 22
-dataddpcr1[dataddpcr1$Well %in% c(&quot;H05&quot;),]$sp &lt;- &quot;Bm&quot;
+dataddpcr1[dataddpcr1$Well %in% c(&quot;H05&quot;),]$sp &lt;- &quot;Bme&quot;
 
 dataddpcr1[dataddpcr1$Well %in% c(&quot;A07&quot;, &quot;B07&quot;),]$Sample &lt;- 32
-dataddpcr1[dataddpcr1$Well %in% c(&quot;A07&quot;, &quot;B07&quot;),]$sp &lt;- &quot;Lc&quot;
+dataddpcr1[dataddpcr1$Well %in% c(&quot;A07&quot;, &quot;B07&quot;),]$sp &lt;- &quot;Lco&quot;
 
 dataddpcr1[substr(dataddpcr1$Well, 1, 1) %in% c(&quot;A&quot;, &quot;B&quot;),]$Dilu &lt;- 1
 dataddpcr1[substr(dataddpcr1$Well, 1, 1) %in% c(&quot;C&quot;, &quot;D&quot;),]$Dilu &lt;- 2
@@ -492,13 +492,13 @@ dataddpcr2$Sample &lt;- as.numeric(dataddpcr2$Sample)
 
 dataddpcr2[dataddpcr2$Sample == 100,]$sp &lt;- &quot;Spk1&quot;
 dataddpcr2[dataddpcr2$Sample == -1,]$sp &lt;- &quot;Neg&quot;
-dataddpcr2[dataddpcr2$Sample == 4,]$sp &lt;- &quot;Sp&quot;
-dataddpcr2[dataddpcr2$Sample == 6,]$sp &lt;- &quot;Pt&quot;
-dataddpcr2[dataddpcr2$Sample == 8,]$sp &lt;- &quot;Ra&quot;
+dataddpcr2[dataddpcr2$Sample == 4,]$sp &lt;- &quot;Spr&quot;
+dataddpcr2[dataddpcr2$Sample == 6,]$sp &lt;- &quot;Ptr&quot;
+dataddpcr2[dataddpcr2$Sample == 8,]$sp &lt;- &quot;Rac&quot;
 dataddpcr2[dataddpcr2$Sample == 10,]$sp &lt;- &quot;Cbe&quot;
-dataddpcr2[dataddpcr2$Sample == 12,]$sp &lt;- &quot;Fe&quot;
-dataddpcr2[dataddpcr2$Sample == 20,]$sp &lt;- &quot;Ac&quot;
-dataddpcr2[dataddpcr2$Sample == 32,]$sp &lt;- &quot;Lc&quot;
+dataddpcr2[dataddpcr2$Sample == 12,]$sp &lt;- &quot;Fex&quot;
+dataddpcr2[dataddpcr2$Sample == 20,]$sp &lt;- &quot;Aca&quot;
+dataddpcr2[dataddpcr2$Sample == 32,]$sp &lt;- &quot;Lco&quot;
 
 dataddpcr2$Concentration &lt;- as.numeric(dataddpcr2$Concentration)</code></pre>
 <pre><code>## Warning: NAs introduced by coercion</code></pre>
@@ -574,11 +574,12 @@ summary_dd &lt;- dataddpcr %&gt;% filter(Used &amp; Sample &lt; 100) %&gt;%
             Mean = mean(Concentration*CtotDNA_ref/TotalDNA),
             min = min(Concentration*CtotDNA_ref/TotalDNA),
             max = max(Concentration*CtotDNA_ref/TotalDNA)) %&gt;%
-  left_join(extraction %&gt;% select(Espece, Sample, `concentration (ng/µl`)) %&gt;%
+  left_join(extraction %&gt;% dplyr::select(Espece, Sample, `concentration (ng/µl`)) %&gt;%
   rename(CDNA_sample = `concentration (ng/µl`,
          Cmolecules_ref = Mean,
          species_name = Espece) %&gt;%
-  select(Sample, species_name, sp, Cmolecules_ref, CDNA_sample)</code></pre>
+  dplyr::select(Sample, species_name, sp,
+                Cmolecules_ref, CDNA_sample)</code></pre>
 <pre><code>## Joining with `by = join_by(Sample)`</code></pre>
 <pre class="r"><code># write_csv(dataddpcr, &quot;data/dataddpcr.csv&quot;)</code></pre>
 </div>
@@ -591,6 +592,7 @@ paper) * G1 = Geometric * U1 = Uniform</p>
 <h3>Bash commands</h3>
 <div id="gobipairing" class="section level4">
 <h4>Gobipairing</h4>
+<p>Paired-end data</p>
 <p>% gobipairing -F 220930_NB501850_A_L1-4_GWM-1746_R1.fastq.gz -R
 220930_NB501850_A_L1-4_GWM-1746_R2.fastq.gz &gt; GWM-1746.paired</p>
 <p>% gobipairing -F 220930_NB501850_A_L1-4_GWM-1748_R1.fastq.gz -R
@@ -609,6 +611,8 @@ ngs_filter_tube_U1_EC_QMETABAR_210722.json GWM-1750_U1</p>
 </div>
 <div id="gobimultiplex" class="section level4">
 <h4>Gobimultiplex</h4>
+<p>Assigns sequence records to the corresponding experiment/sample based
+on DNA tags and primers</p>
 <p>% gobimultiplex -t GWM-1746_L1.ngsfilter -u unassigned46
 GWM-1746.paired &gt; GWM_1746.demultiplex</p>
 <p>% gobimultiplex -t GWM-1748_G1.ngsfilter -u unassigned48
@@ -618,16 +622,18 @@ GWM-1750.paired &gt; GWM_1750.demultiplex</p>
 </div>
 <div id="gobiuniq" class="section level4">
 <h4>Gobiuniq</h4>
-<p>Merge the libraries</p>
+<p>Groups and dereplicates sequences Merge the libraries</p>
 <p>% gobiuniq -m direction -m sample –on-disk GWM_1746.demultiplex
 GWM_1748.demultiplex GWM_1750.demultiplex &gt; GWM_Sper01.uniq</p>
 </div>
 <div id="gobigrep" class="section level4">
 <h4>Gobigrep</h4>
+<p>Filters sequence file</p>
 <p>% gobigrep -c 2 -l 25 -L 75 GWM_Sper01.uniq &gt; GWM_Sper01.grep</p>
 </div>
 <div id="gobiclean" class="section level4">
 <h4>Gobiclean</h4>
+<p>Tags a set of sequences for PCR/sequencing errors identification</p>
 <p>% gobiclean –save-ratio graphSper01.csv –min-eval-rate 100
 –save-graph graph1 GWM_Sper01.grep &gt; GWM_Sper01.clean</p>
 </div>
@@ -676,7 +682,7 @@ df_Sper01 &lt;- data.frame(Sample = rownames(weights)[df_Sper01$i],
            id = colnames(weights)[df_Sper01$j],
            obiclean_weight = df_Sper01$x) %&gt;%
   left_join(df_reads) %&gt;%
-  left_join(data_Sper01 %&gt;% select(id, sequence)) %&gt;%
+  left_join(data_Sper01 %&gt;% dplyr::select(id, sequence)) %&gt;%
   mutate(Community = substr(Sample, 1, 1),
          NegControl = Community == &quot;P&quot;)</code></pre>
 <pre><code>## Joining with `by = join_by(Sample, id)`</code></pre>
@@ -727,7 +733,7 @@ auxU &lt;- df_Sper01 %&gt;% filter(Community == &quot;U&quot; &amp;
                           !NegControl) %&gt;%
   filter(species_name %in%
            c(&quot;Fraxinus_excelsior&quot;, &quot;Carpinus_betulus&quot;, &quot;Capsella_bursa-pastoris&quot;)) %&gt;%
-  select(species_name, obiclean_weight) %&gt;%
+  dplyr::select(species_name, obiclean_weight) %&gt;%
   arrange(species_name) %&gt;%
   pivot_wider(names_from = species_name, values_from = obiclean_weight)</code></pre>
 <pre><code>## Warning: Values from `obiclean_weight` are not uniquely identified; output will contain
@@ -750,7 +756,7 @@ auxT &lt;- df_Sper01 %&gt;% filter(Community == &quot;T&quot; &amp;
                           !NegControl) %&gt;%
   filter(species_name %in%
            c(&quot;Fraxinus_excelsior&quot;, &quot;Carpinus_betulus&quot;, &quot;Capsella_bursa-pastoris&quot;)) %&gt;%
-  select(species_name, obiclean_weight) %&gt;%
+  dplyr::select(species_name, obiclean_weight) %&gt;%
   arrange(species_name) %&gt;%
   pivot_wider(names_from = species_name, values_from = obiclean_weight)</code></pre>
 <pre><code>## Warning: Values from `obiclean_weight` are not uniquely identified; output will contain
@@ -773,7 +779,7 @@ auxG &lt;- df_Sper01 %&gt;% filter(Community == &quot;G&quot; &amp;
                           !NegControl) %&gt;%
   filter(species_name %in%
            c(&quot;Fraxinus_excelsior&quot;, &quot;Carpinus_betulus&quot;, &quot;Capsella_bursa-pastoris&quot;)) %&gt;%
-  select(species_name, obiclean_weight) %&gt;%
+  dplyr::select(species_name, obiclean_weight) %&gt;%
   arrange(species_name) %&gt;%
   pivot_wider(names_from = species_name, values_from = obiclean_weight)</code></pre>
 <pre><code>## Warning: Values from `obiclean_weight` are not uniquely identified; output will contain
@@ -793,7 +799,7 @@ auxG &lt;- df_Sper01 %&gt;% filter(Community == &quot;G&quot; &amp;
 <h2>Taqman qPCR</h2>
 <pre class="r"><code>taqman &lt;- summary_dd %&gt;%
   filter(Sample %in% c(10,12, 26)) %&gt;%
-  select(Sample, species_name, sp, Cmolecules_ref, CDNA_sample) %&gt;%
+  dplyr::select(Sample, species_name, sp, Cmolecules_ref, CDNA_sample) %&gt;%
   distinct(Sample, .keep_all = TRUE)
 
 #Reference concentration = sample Cbe 10

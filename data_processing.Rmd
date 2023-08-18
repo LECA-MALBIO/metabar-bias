@@ -81,37 +81,37 @@ dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "01",]$Sample <- 100
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "01",]$sp <- "Spk1"
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "02",]$Sample <- 14
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "02",]$sp <- "Pa"
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "02",]$sp <- "Pab"
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "03",]$Sample <- 16
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "03",]$sp <- "Lx"
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "03",]$sp <- "Lxy"
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "04",]$Sample <- 18
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "04",]$sp <- "Aa"
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "04",]$sp <- "Aal"
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "05",]$Sample <- 20
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "05",]$sp <- "Ac"
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "05",]$sp <- "Aca"
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "06",]$Sample <- 22
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "06",]$sp <- "Bm"
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "06",]$sp <- "Bme"
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "07",]$Sample <- -1
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "07",]$sp <- "Neg"
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "08",]$Sample <- 24
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "08",]$sp <- "Rc"
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "08",]$sp <- "Rca"
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "09",]$Sample <- 26
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "09",]$sp <- "Cbp"
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "10",]$Sample <- 28
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "10",]$sp <- "Gr"
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "10",]$sp <- "Gro"
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "11",]$Sample <- 30
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "11",]$sp <- "Rf"
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "11",]$sp <- "Rfe"
 
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "12",]$Sample <- 32
-dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "12",]$sp <- "Lc"
+dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "12",]$sp <- "Lco"
 
 #Corrections
 
@@ -119,16 +119,16 @@ dataddpcr1[dataddpcr1$Well %in% c("H07"),]$Sample <- 100
 dataddpcr1[dataddpcr1$Well %in% c("H07"),]$sp <- "Spk1"
 
 dataddpcr1[dataddpcr1$Well %in% c("H06"),]$Sample <- 20
-dataddpcr1[dataddpcr1$Well %in% c("H06"),]$sp <- "Ac"
+dataddpcr1[dataddpcr1$Well %in% c("H06"),]$sp <- "Aca"
 
 dataddpcr1[dataddpcr1$Well %in% c("H01", "A12", "B12"),]$Sample <- -1
 dataddpcr1[dataddpcr1$Well %in% c("H01", "A12", "B12"),]$sp <- "Neg"
 
 dataddpcr1[dataddpcr1$Well %in% c("H05"),]$Sample <- 22
-dataddpcr1[dataddpcr1$Well %in% c("H05"),]$sp <- "Bm"
+dataddpcr1[dataddpcr1$Well %in% c("H05"),]$sp <- "Bme"
 
 dataddpcr1[dataddpcr1$Well %in% c("A07", "B07"),]$Sample <- 32
-dataddpcr1[dataddpcr1$Well %in% c("A07", "B07"),]$sp <- "Lc"
+dataddpcr1[dataddpcr1$Well %in% c("A07", "B07"),]$sp <- "Lco"
 
 dataddpcr1[substr(dataddpcr1$Well, 1, 1) %in% c("A", "B"),]$Dilu <- 1
 dataddpcr1[substr(dataddpcr1$Well, 1, 1) %in% c("C", "D"),]$Dilu <- 2
@@ -166,13 +166,13 @@ dataddpcr2$Sample <- as.numeric(dataddpcr2$Sample)
 
 dataddpcr2[dataddpcr2$Sample == 100,]$sp <- "Spk1"
 dataddpcr2[dataddpcr2$Sample == -1,]$sp <- "Neg"
-dataddpcr2[dataddpcr2$Sample == 4,]$sp <- "Sp"
-dataddpcr2[dataddpcr2$Sample == 6,]$sp <- "Pt"
-dataddpcr2[dataddpcr2$Sample == 8,]$sp <- "Ra"
+dataddpcr2[dataddpcr2$Sample == 4,]$sp <- "Spr"
+dataddpcr2[dataddpcr2$Sample == 6,]$sp <- "Ptr"
+dataddpcr2[dataddpcr2$Sample == 8,]$sp <- "Rac"
 dataddpcr2[dataddpcr2$Sample == 10,]$sp <- "Cbe"
-dataddpcr2[dataddpcr2$Sample == 12,]$sp <- "Fe"
-dataddpcr2[dataddpcr2$Sample == 20,]$sp <- "Ac"
-dataddpcr2[dataddpcr2$Sample == 32,]$sp <- "Lc"
+dataddpcr2[dataddpcr2$Sample == 12,]$sp <- "Fex"
+dataddpcr2[dataddpcr2$Sample == 20,]$sp <- "Aca"
+dataddpcr2[dataddpcr2$Sample == 32,]$sp <- "Lco"
 
 dataddpcr2$Concentration <- as.numeric(dataddpcr2$Concentration)
 dataddpcr2$AcceptedDroplets <- as.numeric(dataddpcr2$AcceptedDroplets)
@@ -247,11 +247,12 @@ summary_dd <- dataddpcr %>% filter(Used & Sample < 100) %>%
             Mean = mean(Concentration*CtotDNA_ref/TotalDNA),
             min = min(Concentration*CtotDNA_ref/TotalDNA),
             max = max(Concentration*CtotDNA_ref/TotalDNA)) %>%
-  left_join(extraction %>% select(Espece, Sample, `concentration (ng/µl`)) %>%
+  left_join(extraction %>% dplyr::select(Espece, Sample, `concentration (ng/µl`)) %>%
   rename(CDNA_sample = `concentration (ng/µl`,
          Cmolecules_ref = Mean,
          species_name = Espece) %>%
-  select(Sample, species_name, sp, Cmolecules_ref, CDNA_sample)
+  dplyr::select(Sample, species_name, sp,
+                Cmolecules_ref, CDNA_sample)
 
 # write_csv(dataddpcr, "data/dataddpcr.csv")
 ```
@@ -383,7 +384,7 @@ df_Sper01 <- data.frame(Sample = rownames(weights)[df_Sper01$i],
            id = colnames(weights)[df_Sper01$j],
            obiclean_weight = df_Sper01$x) %>%
   left_join(df_reads) %>%
-  left_join(data_Sper01 %>% select(id, sequence)) %>%
+  left_join(data_Sper01 %>% dplyr::select(id, sequence)) %>%
   mutate(Community = substr(Sample, 1, 1),
          NegControl = Community == "P")
 
@@ -436,7 +437,7 @@ auxU <- df_Sper01 %>% filter(Community == "U" &
                           !NegControl) %>%
   filter(species_name %in%
            c("Fraxinus_excelsior", "Carpinus_betulus", "Capsella_bursa-pastoris")) %>%
-  select(species_name, obiclean_weight) %>%
+  dplyr::select(species_name, obiclean_weight) %>%
   arrange(species_name) %>%
   pivot_wider(names_from = species_name, values_from = obiclean_weight)
 
@@ -451,7 +452,7 @@ auxT <- df_Sper01 %>% filter(Community == "T" &
                           !NegControl) %>%
   filter(species_name %in%
            c("Fraxinus_excelsior", "Carpinus_betulus", "Capsella_bursa-pastoris")) %>%
-  select(species_name, obiclean_weight) %>%
+  dplyr::select(species_name, obiclean_weight) %>%
   arrange(species_name) %>%
   pivot_wider(names_from = species_name, values_from = obiclean_weight)
 matT <- as.matrix(auxT[,-1])
@@ -465,7 +466,7 @@ auxG <- df_Sper01 %>% filter(Community == "G" &
                           !NegControl) %>%
   filter(species_name %in%
            c("Fraxinus_excelsior", "Carpinus_betulus", "Capsella_bursa-pastoris")) %>%
-  select(species_name, obiclean_weight) %>%
+  dplyr::select(species_name, obiclean_weight) %>%
   arrange(species_name) %>%
   pivot_wider(names_from = species_name, values_from = obiclean_weight)
 matG <- as.matrix(auxG[,-1])
@@ -478,7 +479,7 @@ matG <- as.matrix(auxG[,-1])
 ```{r pipeline taqman}
 taqman <- summary_dd %>%
   filter(Sample %in% c(10,12, 26)) %>%
-  select(Sample, species_name, sp, Cmolecules_ref, CDNA_sample) %>%
+  dplyr::select(Sample, species_name, sp, Cmolecules_ref, CDNA_sample) %>%
   distinct(Sample, .keep_all = TRUE)
 
 #Reference concentration = sample Cbe 10

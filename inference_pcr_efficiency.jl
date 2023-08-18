@@ -267,11 +267,11 @@ mean(reads_U, dims = 1) ./ sum(mean(reads_U, dims = 1))
 Lambda #Cbe, Cbp, Fe
 optU_eff.minimizer[[8, 6, 7]] #Cbe, Cbp, Fe
 
-Lambda ./ optU_eff.minimizer[[8, 6, 7]]
+optU_eff.minimizer[[8, 6, 7]] ./ Lambda
 
 
-0.972/optU_eff.minimizer[[8]] #CbeA
-0.947/optU_eff.minimizer[[8]] #CbeB
+optU_eff.minimizer[[8]] / 0.972 #CbeA
+optU_eff.minimizer[[8]] / 0.947 #CbeB
 
 
 ## Inference for communities T and G with inferred Lambdas
