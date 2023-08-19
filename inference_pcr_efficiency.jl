@@ -264,7 +264,7 @@ simU = simu_pcr_normalQ_eff(vcat(0.9, vec(optU_eff.minimizer)),
 mean(simU, dims = 1) ./ sum(mean(simU, dims = 1))
 mean(reads_U, dims = 1) ./ sum(mean(reads_U, dims = 1))
 
-Lambda #Cbe, Cbp, Fe
+Lambda #Cbe, Cbp, Fex, file inference_metabarcoding.jl
 optU_eff.minimizer[[8, 6, 7]] #Cbe, Cbp, Fe
 
 optU_eff.minimizer[[8, 6, 7]] ./ Lambda
@@ -277,7 +277,7 @@ optU_eff.minimizer[[8]] / 0.947 #CbeB
 ## Inference for communities T and G with inferred Lambdas
 ##____________________________________________________________________________________________________
 
-Lambda_infer = vcat(0.9, vec(optU_eff.minimizer))
+Lambda_infer = vcat(1., vec(optU_eff.minimizer))
 
 reads_T = Float64.(Matrix(CSV.read("data/reads_T.csv", DataFrame)))
 reads_G = Float64.(Matrix(CSV.read("data/reads_G.csv", DataFrame)))

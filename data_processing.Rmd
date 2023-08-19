@@ -396,7 +396,7 @@ df_Sper01[!df_Sper01$NegControl,"Spike_level"] <- as.numeric(substr(df_Sper01[!d
 
 df_Sper01[df_Sper01$NegControl,"Spike_level"] <- as.numeric(substr(df_Sper01[df_Sper01$NegControl,]$Sample, 12, 12))
 
-df_Sper01 <- df_Sper01 %>% filter(Spike_level == 1) #***
+df_Sper01 <- df_Sper01 %>% filter(Spike_level == 1)
 
 summary_sample <- df_Sper01 %>%
   group_by(Sample) %>%
@@ -423,6 +423,48 @@ df_Sper01[is.na(df_Sper01$species_name),"species_name"] <- as.character(df_Sper0
 # write_csv(df_Sper01, "data/df_Sper01.csv")
 
 ```
+
+Open data before filtering (grep, clean)
+
+```{r data before filtering}
+# data_Sper01_prev <- read_obifasta("data/GWM_Sper01.uniq")
+# 
+# reads <- extract_readcount(data_Sper01_prev)
+# df_reads <- Matrix::summary(reads)
+# df_reads <- data.frame(Sample = rownames(reads)[df_reads$i],
+#            id = colnames(reads)[df_reads$j],
+#            reads = df_reads$x)
+# 
+# df_Sper01 <- Matrix::summary(reads) #"pivot longer"
+# 
+# df_Sper01 <- df_reads %>%
+#   left_join(data_Sper01_prev %>% dplyr::select(id, sequence)) %>%
+#   mutate(Community = substr(Sample, 1, 1),
+#          NegControl = Community == "P")
+# 
+# df_Sper01[df_Sper01$Community == "P", "Community"] <- substr(df_Sper01[df_Sper01$Community == "P",]$Sample, 8, 8)
+# df_Sper01[df_Sper01$Community == "L", "Community"] <- "T"
+# 
+# df_Sper01$Spike_level <- NA
+# df_Sper01[!df_Sper01$NegControl,"Spike_level"] <- as.numeric(substr(df_Sper01[!df_Sper01$NegControl,]$Sample, 4, 4))
+# 
+# df_Sper01[df_Sper01$NegControl,"Spike_level"] <- as.numeric(substr(df_Sper01[df_Sper01$NegControl,]$Sample, 12, 12))
+# 
+# df_Sper01 <- df_Sper01 %>% filter(Spike_level == 1)
+# 
+# summary_sample <- df_Sper01 %>%
+#   group_by(Sample) %>%
+#   summarise(total_count_sample = sum(reads),
+#             NegControl = NegControl[1],
+#             Spike_level = Spike_level[1],
+#             Community = Community[1]) %>%
+#   arrange(total_count_sample)
+# 
+# summary_sample %>% filter(!NegControl) %>%
+#   pull(total_count_sample) %>% summary
+
+```
+
 
 Export data to Julia for Taqman analysis
 
