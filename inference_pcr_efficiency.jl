@@ -310,7 +310,7 @@ optG_full = optim_Qmetabar(reads_G, Lambda_infer,
   dispersion = 1.,
   nsim = 190)
 
-optG_full.minimizer ./ sum(optG_full.minimizer)
+vec(optG_full.minimizer ./ sum(optG_full.minimizer))
 mean(reads_G ./ sum(reads_G, dims = 2), dims = 1)
 
 CSV.write("data/prop_inferU.csv", Tables.table(optU_full.minimizer ./ sum(optU_full.minimizer)))
