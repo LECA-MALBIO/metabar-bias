@@ -12,6 +12,8 @@ author:
     institute: leca
   - name: Delphine Rioux
     institute: leca
+  - name: Pierre Taberlet
+    institute: leca
   - name: Christelle Gonindard-Melodelima
     institute: leca
   - name: Eric Coissac
@@ -31,10 +33,11 @@ library(dplyr)
 library(egg)
 library(ggpubr)
 library(ggplot2)
-theme_set(theme_bw())
+theme_set(theme_classic())
 library(ggrepel)
 library(ggtext)
 library(glue)
+library(latex2exp)
 library(readxl)
 library(tidyverse)
 
@@ -53,6 +56,7 @@ Last edit: 09/07/2023
 
 digital droplet PCR (ddPCR) data
 
+Cmolecules-ref : Copies of target molecules per ng of total DNA
 
 ```{r open ddpcr data}
 dataddpcr <- read_csv("data/dataddpcr.csv")
@@ -70,9 +74,9 @@ CtotDNA_ref <- 2.5e-3 *Vdna_dd/Vmix_dd
 summary_dd <- dataddpcr %>% filter(Used & Sample < 100) %>%
   group_by(Sample) %>%
   summarise(sp = sp[1],
-            Mean = mean(Concentration*CtotDNA_ref/TotalDNA),
-            min = min(Concentration*CtotDNA_ref/TotalDNA),
-            max = max(Concentration*CtotDNA_ref/TotalDNA)) %>%
+            Mean = mean(Concentration/TotalDNA),
+            min = min(Concentration/TotalDNA),
+            max = max(Concentration/TotalDNA)) %>%
   left_join(extraction %>% dplyr::select(Espece, Sample, `concentration (ng/µl`)) %>%
   rename(CDNA_sample = `concentration (ng/µl`,
          Cmolecules_ref = Mean,
@@ -93,7 +97,7 @@ C_species_ref <- CDNA_T/13 #concentration of Pt6, ng/ul
 summary_dd <- summary_dd %>%
   mutate(Volume_equi = max(Cmolecules_ref)/Cmolecules_ref,
          cDNA_U = C_species_ref*Volume_equi,
-         molecules_U = cDNA_U/CtotDNA_ref*Cmolecules_ref,
+         molecules_U = cDNA_U*Cmolecules_ref,
          propU = molecules_U/sum(molecules_U))
 #molecules/ul in sample
 ```
@@ -112,7 +116,7 @@ Number of molecules in the T community
 
 ```{r commu T}
 summary_dd <- summary_dd %>%
-  mutate(molecules_T = C_species_ref/CtotDNA_ref*Cmolecules_ref,
+  mutate(molecules_T = C_species_ref*Cmolecules_ref,
          propT = molecules_T/sum(molecules_T))
 
 VDNA_metab * summary_dd$molecules_T
@@ -130,7 +134,7 @@ Number of molecules in the T community
 summary_dd <- summary_dd %>%
   mutate(RankG = 13 - rank(CDNA_sample/Volume_equi) + 1,
          cDNA_G = CDNA_T/2^RankG*Volume_equi,
-         molecules_G = cDNA_G/CtotDNA_ref*Cmolecules_ref,
+         molecules_G = cDNA_G*Cmolecules_ref,
          propG = molecules_G/sum(molecules_G))
 
 summary_dd$molecules_G * VDNA_metab
@@ -139,7 +143,7 @@ sum(summary_dd$molecules_G) * VDNA_metab
 
 ### Figure
 
-Figure 2 of the manuscript
+Figure 3 of the manuscript
 
 ```{r ddpcr analysis}
 data_dd_fig <- dataddpcr %>% filter(Used & Sample < 100) %>%
@@ -154,23 +158,32 @@ highlight <- function(x, pat, color="black", family="") {
 
 ggplot(data_dd_fig)+
   geom_point(aes(factor(sp, levels = order_short, ordered = T),
-                 Concentration_std,
+                 Concentration_copies_ng/1000,
                  shape = as.factor(TotalDNA)))+
   geom_point(data = summary_dd,
-             aes(as.factor(sp), Cmolecules_ref),
+             aes(as.factor(sp), Cmolecules_ref/1000),
              fill = "red", shape = 23, size = 3)+
-  ggtitle(
-    "Target DNA molecules for Total DNA concentration = 6.25e-4 ng/ul")+
+  # ggtitle("Target DNA molecules for Total DNA concentration = 6.25e-4 ng/ul")+
   labs(x = "Plant species",
-       y = "Number of molecules per ul\n",
-       shape = "Total DNA\nconcentration\n(ng/ul)\nin the replicate")+
+       y = "Thousands of molecules per ng of total DNA\n",
+       shape = TeX("Concentration (ng/$\\mu l$)"))+
   scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))+
-  theme(axis.text.x=element_markdown())
+  theme(axis.text.x=element_markdown(),
+        legend.title.align=0.5)
 
-# ggsave(filename = "ddpcr_fig_clean.pdf",
-#        dpi = 600, units = "mm",
-#        width = 180, height = 130, device = "pdf")
+ggsave(filename = "ddpcr_fig_clean.pdf",
+       dpi = 600, units = "mm",
+       width = 180, height = 130, device = "pdf")
 ```
+
+Stats ddpcr
+
+```{r stats ddpcr}
+
+summary_dd$Cmolecules_ref %>% summary
+
+```
+
 
 ## Metabarcoding analysis
 
@@ -261,63 +274,83 @@ df_targetG <- df_Sper01 %>% filter(Community == "G" &
   rename(prop_expected = propG)
 ```
 
-Figure 3 of the manuscript
+Figure 4 of the manuscript
 
 ```{r observed proportions}
-colp <- c("Expected" = "gold", "Observed\n(Median)" = "red", "Inferred\nwith model" = "darkolivegreen2")
+colp <- c("Expected" = "gold",
+          "Expected\nwithout\nPCR bias" = "gold",
+          "Expected\nwithout\nPCR and\nconcentration\nbiases" = "gold",
+          "Observed\n(Median)" = "red",
+          "Inferred\nwith model" = "darkolivegreen2")
 
 gobsU1 <- ggplot(df_targetU)+
   geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
                    prop))+
-  theme(axis.text.x=element_blank())+
-  ggtitle("Uniform community (U)")+
-  theme(plot.title = element_text(hjust = 0.5))+
-  labs(y = "", x = "")+
-  geom_hline(yintercept = 1/nrow(summary_dd),
-             color = "gold")
+      geom_point(data = summary_dd,
+             aes(sp, 1/nrow(summary_dd),
+                 fill = "Expected\nwithout\nPCR bias"),
+             shape = 23,
+             size = 3)+
+    geom_hline(aes(yintercept = 1/nrow(summary_dd),
+                 col = "Expected\nwithout\nPCR and\nconcentration\nbiases"),
+             linetype = "dashed")+
+  ggtitle(TeX("Uniform community (${{M}_U}$)"))+
+  labs(y = "", x = "", fill = "", col = "")+
+  ylim(min(df_targetT$prop), max(df_targetT$prop)) +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x=element_markdown(),
+        legend.title.align=0.5)+
+  scale_color_manual(values = colp)+
+  scale_fill_manual(values = colp)+
+  scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))
+  
 
 gobsT1 <- ggplot(df_targetT)+
   geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
                    prop))+
-  theme(axis.text.x=element_blank())+
-  ggtitle("Uniform in Total DNA community (T)")+
-  theme(plot.title = element_text(hjust = 0.5))+
-  labs(y = "", x = "", fill = "")+
-  geom_point(data = summary_dd,
-             aes(sp, propT, fill = "Expected"),
+    geom_point(data = summary_dd,
+             aes(sp, propT, fill = "Expected\nwithout\nPCR bias"),
              shape = 23,
              size = 3)+
-  geom_hline(yintercept = 1/nrow(summary_dd),
-             color = "gold", linetype = "dashed")+
-  scale_fill_manual(values = colp)
+  geom_hline(aes(yintercept = 1/nrow(summary_dd), col = "Expected\nwithout\nPCR and\nconcentration\nbiases"),
+             linetype = "dashed")+
+  ggtitle(TeX("Uniform in Total DNA community (${{M}_T}$)"))+
+  labs(y = "", x = "", fill = "", col = "")+
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x=element_markdown(),
+        legend.title.align=0.5)+
+  scale_color_manual(values = colp)+
+  scale_fill_manual(values = colp)+
+    scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))
 
-gobsG1 <- ggplot(df_targetG)+
-  geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
-                   prop))+
-  labs(y = "", x = "")+
-  ggtitle("Geometric community (G)")+
-  theme(plot.title = element_text(hjust = 0.5))+
-  geom_point(data = summary_dd,
-             aes(sp, propG), shape = 23,
-             fill = "gold", size = 3)+
-  scale_y_log10()+
-  scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))+
-  theme(axis.text.x=element_markdown())
 
-fig <- egg::ggarrange(gobsU1, gobsT1, gobsG1,
-                  ncol = 1)
+# gobsG1 <- ggplot(df_targetG)+
+#   geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
+#                    prop))+
+#   labs(y = "", x = "")+
+#   ggtitle("Geometric community (G)")+
+#   theme(plot.title = element_text(hjust = 0.5))+
+#   geom_point(data = summary_dd,
+#              aes(sp, propG), shape = 23,
+#              fill = "gold", size = 3)+
+#   scale_y_log10()
+
+fig <- ggpubr::ggarrange(gobsU1, gobsT1, #gobsG1,
+                  ncol = 1,
+                  common.legend = T,
+                  legend = "right")
 annotate_figure(fig,
-                top = text_grob("Final abundances in two mock communities with Sper01"),
+                # top = text_grob("Final abundances in two mock communities with Sper01"),
                 bottom = text_grob("Species"),
                 left = text_grob("Observed reads proportions", rot = 90))
 
 # ggsave("metabar_results.pdf", units = "mm",
-#        width = 180, height = 200, dpi = 600, device = "pdf")
+#        width = 150, height = 200, dpi = 600, device = "pdf")
 ```
 
 Proportions of Ptr in U
 
-```{r}
+```{r ptr prop}
 df_targetU %>% filter(sp == "Ptr") %>% pull(prop) %>% summary
 df_targetU %>% filter(sp == "Ptr") %>% pull(prop) %>% sd
 
@@ -329,7 +362,7 @@ df_targetG %>% group_by(sp) %>% summarise(s = sd(prop), m = mean(prop)) %>%arran
 
 Export to Julia to infer efficiencies
 
-```{r}
+```{r export julia U}
 readsU <- df_targetU %>%
   dplyr::select(Sample, obiclean_weight, species_name) %>%
   pivot_wider(names_from = species_name, values_from = obiclean_weight) %>% ungroup %>% dplyr::select(-Sample)
@@ -407,49 +440,49 @@ df_targetG$species_name <- factor(df_targetG$species_name,
 
 ```{r T adn G corrected by U}
 
-ginferT1 <- ggplot(df_targetT)+
-  geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
-                   prop_infer_mock))+
-  geom_point(data = df_targetT %>% group_by(sp) %>%
-               summarise(prop = median(prop)),
-    aes(sp, prop, fill = "Observed\n(Median)"),
-             shape = 21, size = 3)+
-  theme(axis.text.x=element_blank())+
-  labs(y = "", x = "",
-       fill = "", col = "")+
-  geom_point(data = summary_dd,
-             aes(sp, propT, fill = "Expected"), shape = 23,
-             size = 3)+
-  scale_fill_manual(values = colp)+
-  ggtitle("Uniform in Total DNA community (T)")+
-  theme(plot.title = element_text(hjust = 0.5))
-
-ginferG1 <- ggplot(df_targetG)+
-  geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
-                   prop_infer_mock))+
-  geom_point(data = df_targetG %>% group_by(sp) %>%
-               summarise(prop = median(prop)),
-             aes(sp, prop, fill = "Observed\n(Median)"),
-             shape = 21, size = 3)+
-  labs(y = "", x = "",
-       fill = "", col = "")+
-  geom_point(data = summary_dd,
-             aes(sp, propG, fill = "Expected"), shape = 23,
-             size = 3)+
-  scale_fill_manual(values = colp)+
-  ggtitle("Geometric community (G)")+
-  theme(plot.title = element_text(hjust = 0.5),
-        legend.position = "none")+
-  scale_y_log10()+
-  scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))+
-  theme(axis.text.x=element_markdown())
-
-fig <- egg::ggarrange(ginferT1, ginferG1,
-                      ncol = 1)
-annotate_figure(fig,
-                top = text_grob("Corrected abundances in two mock communities with Sper01"),
-                bottom = text_grob("Species"),
-                left = text_grob("Inferred reads proportions", rot = 90))
+# ginferT1 <- ggplot(df_targetT)+
+#   geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
+#                    prop_infer_mock))+
+#   geom_point(data = df_targetT %>% group_by(sp) %>%
+#                summarise(prop = median(prop)),
+#     aes(sp, prop, fill = "Observed\n(Median)"),
+#              shape = 21, size = 3)+
+#   theme(axis.text.x=element_blank())+
+#   labs(y = "", x = "",
+#        fill = "", col = "")+
+#   geom_point(data = summary_dd,
+#              aes(sp, propT, fill = "Expected"), shape = 23,
+#              size = 3)+
+#   scale_fill_manual(values = colp)+
+#   ggtitle("Uniform in Total DNA community (T)")+
+#   theme(plot.title = element_text(hjust = 0.5))
+# 
+# ginferG1 <- ggplot(df_targetG)+
+#   geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
+#                    prop_infer_mock))+
+#   geom_point(data = df_targetG %>% group_by(sp) %>%
+#                summarise(prop = median(prop)),
+#              aes(sp, prop, fill = "Observed\n(Median)"),
+#              shape = 21, size = 3)+
+#   labs(y = "", x = "",
+#        fill = "", col = "")+
+#   geom_point(data = summary_dd,
+#              aes(sp, propG, fill = "Expected"), shape = 23,
+#              size = 3)+
+#   scale_fill_manual(values = colp)+
+#   ggtitle("Geometric community (G)")+
+#   theme(plot.title = element_text(hjust = 0.5),
+#         legend.position = "none")+
+#   scale_y_log10()+
+#   scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))+
+#   theme(axis.text.x=element_markdown())
+# 
+# fig <- egg::ggarrange(ginferT1, ginferG1,
+#                       ncol = 1)
+# annotate_figure(fig,
+#                 top = text_grob("Corrected abundances in two mock communities with Sper01"),
+#                 bottom = text_grob("Species"),
+#                 left = text_grob("Inferred reads proportions", rot = 90))
 
 # ggsave("metabar_results_corrected.pdf", units = "mm",
 #        width = 180, height = 150, dpi = 600, device = "pdf")
@@ -506,7 +539,7 @@ sqrt(sum(((resG1$prop_infer-resG1$prop_expected)/resG1$prop_expected)^2)/nrow(re
 ```
 Proportions inferred in julia :
 
-```{r}
+```{r export julia G}
 inferG <- read.csv("data/prop_inferG.csv")
 colnames(inferG) <- colnames(readsG)
 inferG <- inferG %>% pivot_longer(everything(), names_to = "species_name", values_to = "infer_propG") %>%
@@ -524,37 +557,37 @@ inferG %>% mutate(relerr = ((infer_propG - prop_expected)/prop_expected)^2) %>%
 
 ```
 
-Figure 4 of the manuscript:
+
 
 ```{r G corrected by U}
-
-ginferG1 <- ggplot(df_targetG)+
-  geom_boxplot(aes(factor(sp, levels = order_short,
-                          ordered = T),
-                   prop_infer_mock))+
-  geom_point(data = df_targetG %>% group_by(sp) %>%
-               summarise(prop = median(prop)),
-             aes(sp, prop, fill = "Observed\n(Median)"),
-             shape = 23, size = 2)+
-    geom_point(data = inferG,
-             aes(sp, infer_propG, fill = "Inferred\nwith model"),
-             shape = 23, size = 2)+
-  labs(y = "Initial proportions\ninferred from U", x = "Species",
-       fill = "", col = "")+
-  geom_point(data = summary_dd,
-             aes(sp, propG, fill = "Expected"), shape = 23,
-             size = 2)+
-  scale_fill_manual(values = colp)+
-  ggtitle("Corrected abundances in the Geometric community (G)")+
-  theme(plot.title = element_text(hjust = 0.5))+
-  scale_y_log10()+
-  scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))+
-  theme(axis.text.x=element_markdown())
-
-ginferG1
+# 
+# ginferG1 <- ggplot(df_targetG)+
+#   geom_boxplot(aes(factor(sp, levels = order_short,
+#                           ordered = T),
+#                    prop_infer_mock))+
+#   geom_point(data = df_targetG %>% group_by(sp) %>%
+#                summarise(prop = median(prop)),
+#              aes(sp, prop, fill = "Observed\n(Median)"),
+#              shape = 23, size = 2)+
+#     geom_point(data = inferG,
+#              aes(sp, infer_propG, fill = "Inferred\nwith model"),
+#              shape = 23, size = 2)+
+#   labs(y = "Initial proportions\ninferred from U", x = "Species",
+#        fill = "", col = "")+
+#   geom_point(data = summary_dd,
+#              aes(sp, propG, fill = "Expected"), shape = 23,
+#              size = 2)+
+#   scale_fill_manual(values = colp)+
+#   ggtitle("Corrected abundances in the Geometric community (G)")+
+#   theme(plot.title = element_text(hjust = 0.5))+
+#   scale_y_log10()+
+#   scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))+
+#   theme(axis.text.x=element_markdown())
+# 
+# ginferG1
 
 # ggsave("metabar_results_corrected_G.pdf", units = "mm",
-#        width = 180, height = 150, dpi = 600, device = "pdf")
+#        width = 150, height = 150, dpi = 600, device = "pdf")
 
 ```
 
@@ -798,7 +831,7 @@ ggplot(res_taqman %>% filter(!Neg & sp == "Cbe"))+
 
 ### Amplification bias
 
-```{r}
+```{r prop commu 3 species}
 qmet <- df_targetU %>%
   filter(species_name %in% c("Capsella_bursa-pastoris",
                              "Carpinus_betulus",
@@ -958,8 +991,7 @@ Parameters are fitted numerically. No biological consideration.
 
 Figure 1 of the manuscript
 
-```{r saturation models - figure}
-
+```{r saturation models}
 KWell <- max(ampli$molecules)
 
 opt_exp <- optim(c(5.75, 0.55),
@@ -1071,6 +1103,10 @@ fitlog <- pcrfit(data_ampli, 1, 2, mlog,
 
 res_log <- a*fitlog$m$predict(newdata = fitlog$DATA)+b
 # res_mec <- a*fitmec$m$predict(newdata = fitmec$DATA)+b
+```
+
+
+```{r saturation models - figure}
 
 ggplot()+
         geom_point(data = ampli, aes(Cycle-1, molecules))+
@@ -1078,22 +1114,23 @@ ggplot()+
                                    col = "Logistic"),
                   linewidth = 0.75)+
         geom_line(aes(0:(60-1), modele_exp[-1],
-                      col = "None\n(Exponential)"),
+                      col = "Exponential"),
                   linewidth = 0.75)+
         # geom_line(aes(0:(60-1), pmec[-1,1],
         #               col = "mechanistic\n(data not shown)"), linewidth = 0.75)+
         labs(x = "Cycle",
              y = "Estimated number of molecules", 
-             col = "Saturation\nmodel")+
+             col = "Amplification model")+
         theme(legend.justification = c(1, 0),
               legend.position = c(1, 0),
         legend.box.margin=margin(rep(10, 4)))+
   coord_cartesian(xlim = c(0, 50), ylim = c(0, KWell))+
-        ggtitle(
-          paste0("Real qPCR data and saturation models - Species : ",
-                       "Capsella bursa-pastoris"))
+  scale_colour_brewer(palette = "Set1")
+        # ggtitle(
+        #   paste0("Real qPCR data and saturation models - Species : ",
+        #                "Capsella bursa-pastoris"))
 
-# ggsave(filename = "saturation_models3.pdf",
+# ggsave(filename = "saturation_models2.pdf",
 #        dpi = 600, units = "mm",
 #        width = 180, height = 120, device = "pdf")
 
@@ -1134,26 +1171,58 @@ prop2 <- df_targetU %>% group_by(sp) %>%
   summarise(propU = median(prop)) %>% ungroup() %>%
   mutate(propU = propU/(propU+propU[11])) %>% #11 = Rc...
   left_join(summary_dd %>% dplyr::select(sp, efficiencies)) %>%
-  mutate(deff = 1/efficiencies-1) %>% filter(sp != "Rc")
+  mutate(deff = 1-efficiencies) %>% filter(sp != "Rc")
+```
+figure 5 of the manuscript
+
+```{r simu pcr 2 species : fig}
+
+prop2$labelx <- prop2$deff - 0.0021
+prop2[prop2$sp == "Rfe","labelx"] <- prop2[prop2$sp == "Rfe","labelx"]+0.0042
+prop2[prop2$sp == "Lco","labelx"] <- prop2[prop2$sp == "Lco","labelx"]+0.0042
+prop2[prop2$sp == "Lxy","labelx"] <- prop2[prop2$sp == "Lxy","labelx"]+0.0042
+prop2[prop2$sp == "Aal","labelx"] <- prop2[prop2$sp == "Aal","labelx"]+0.0038
+prop2[prop2$sp == "Bme","labelx"] <- prop2[prop2$sp == "Bme","labelx"]+0.0037
+prop2[prop2$sp == "Cbe","labelx"] <- prop2[prop2$sp == "Cbe","labelx"]+0.0021
+
 
 ggplot()+
-    geom_line(aes(lam1/Lam2-1, res[,1]/(rowSums(res)), col = "Rosa canina"))+
-  geom_line(aes(lam1/Lam2-1, res[,2]/(rowSums(res)), col = "other"))+
-  ggtitle("Simulated mock communities of two species with equal starting quantities")+
+    geom_vline(data = prop2 %>% filter(sp != "Rca"), aes(xintercept = deff),
+             col = "grey80")+
+    geom_line(aes(1-Lam2/lam1, res[,1]/(rowSums(res)), col = "Rosa canina"))+
+  geom_line(aes(1-Lam2/lam1, res[,2]/(rowSums(res)), col = "other"))+
   geom_hline(yintercept = 0.5, linetype = "dashed")+
-  theme(plot.title = element_text(hjust = 0.5))+
-  labs(x = "Relative variation of PCR efficiency", y = "Final relative abundances", col = "Species")+
-  ylim(0, 1)+
-  coord_cartesian(xlim = c(0.005, 0.17))+
-  geom_point(data = prop2 %>% filter(sp != "Rca"), aes(deff, propU))+
-  geom_point(data = prop2 %>% filter(sp != "Rca"), aes(deff, 1-propU))+
-    geom_text_repel(
-    data = prop2 %>% filter(sp != "Rca"),
-    aes(deff, propU, label = sp),
-    size = 4,
-    min.segment.length = unit(0, 'lines'))+
+  # ggtitle("Simulated mock communities of two species with equal starting quantities")+
+  # theme(plot.title = element_text(hjust = 0.5))+
+  geom_point(data = prop2 %>% filter(sp != "Rca"),
+             aes(deff, propU, col = "other"))+
+  geom_point(data = prop2 %>% filter(sp != "Rca"),
+             aes(deff, 1-propU, col = "Rosa canina"))+
+  geom_text(aes(0.115, 0.73, label = "Rosa canina", col = "Rosa canina"),
+            size = 4)+
+  geom_text(aes(0.115, 0.27, label = "Second species", col = "other"),
+            size = 4)+
+  geom_text(data = prop2 %>% filter(sp != "Rca") %>% arrange(efficiencies),
+              aes(labelx, 1, label = sp),
+            col = "grey50",
+            size = 3, angle = 90)+
+    geom_text(data = prop2 %>% filter(sp %in% c("Cbe", "Cbp", "Fex")) %>%
+                arrange(efficiencies),
+              aes(labelx, 1, label = sp),
+            col = "grey25",
+            size = 3, angle = 90)+
+  labs(x = "Relative decrease of PCR efficiency compared to Rosa canina",
+       y = "Final relative abundances", col = "Species")+
+  coord_cartesian(xlim = c(0.006, 0.15), ylim = c(0,1))+
   theme(legend.position = "none")+
-  geom_text(aes(0.09, 0.9, label = "Rosa canina"), size = 4)
+  scale_colour_brewer(palette = "Set1")
+  #   geom_text_repel(
+  #   data = prop2 %>% filter(sp != "Rca"),
+  #   aes(deff, propU, label = sp),
+  #   size = 4,
+  #   min.segment.length = unit(0, 'lines'))
+
+# rep(c(1,0.95), 6)
 
 # ggsave(filename = "simulambda.pdf", units = "mm",
 #        height = 120, width = 180, device = "pdf", dpi = 600)

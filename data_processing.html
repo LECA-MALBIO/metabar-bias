@@ -356,6 +356,7 @@ metabarcoding results ? - data processing</h1>
 <h4 class="author">Didier Piau</h4>
 <h4 class="author">Frédéric Laporte</h4>
 <h4 class="author">Delphine Rioux</h4>
+<h4 class="author">Pierre Taberlet</h4>
 <h4 class="author">Christelle Gonindard-Melodelima</h4>
 <h4 class="author">Eric Coissac</h4>
 <a class="author_email" href="mailto:#"><a href="mailto:eric.coissac@metabarcoding.org" class="email">eric.coissac@metabarcoding.org</a></a>
@@ -566,14 +567,14 @@ maxDNA &lt;- 0.25 *Vdna_dd/Vmix_dd #ng/ul
 dataddpcr$TotalDNA &lt;- maxDNA/10^(dataddpcr$Dilu-1)
 
 dataddpcr &lt;- dataddpcr %&gt;%
-  mutate(Concentration_std = Concentration*CtotDNA_ref/TotalDNA)
+  mutate(Concentration_copies_ng = Concentration/TotalDNA)
 
 summary_dd &lt;- dataddpcr %&gt;% filter(Used &amp; Sample &lt; 100) %&gt;%
   group_by(Sample) %&gt;%
   summarise(sp = sp[1],
-            Mean = mean(Concentration*CtotDNA_ref/TotalDNA),
-            min = min(Concentration*CtotDNA_ref/TotalDNA),
-            max = max(Concentration*CtotDNA_ref/TotalDNA)) %&gt;%
+            Mean = mean(Concentration/TotalDNA),
+            min = min(Concentration/TotalDNA),
+            max = max(Concentration/TotalDNA)) %&gt;%
   left_join(extraction %&gt;% dplyr::select(Espece, Sample, `concentration (ng/µl`)) %&gt;%
   rename(CDNA_sample = `concentration (ng/µl`,
          Cmolecules_ref = Mean,
@@ -695,7 +696,7 @@ df_Sper01[!df_Sper01$NegControl,&quot;Spike_level&quot;] &lt;- as.numeric(substr
 
 df_Sper01[df_Sper01$NegControl,&quot;Spike_level&quot;] &lt;- as.numeric(substr(df_Sper01[df_Sper01$NegControl,]$Sample, 12, 12))
 
-df_Sper01 &lt;- df_Sper01 %&gt;% filter(Spike_level == 1) #***
+df_Sper01 &lt;- df_Sper01 %&gt;% filter(Spike_level == 1)
 
 summary_sample &lt;- df_Sper01 %&gt;%
   group_by(Sample) %&gt;%
@@ -722,6 +723,997 @@ df_Sper01 &lt;- df_Sper01 %&gt;% left_join(summary_sample[,1:2]) %&gt;%
 <pre class="r"><code>df_Sper01[is.na(df_Sper01$species_name),&quot;species_name&quot;] &lt;- as.character(df_Sper01[is.na(df_Sper01$species_name),]$seq_rank)
 
 # write_csv(df_Sper01, &quot;data/df_Sper01.csv&quot;)</code></pre>
+<div id="contamination-check" class="section level4">
+<h4>Contamination check</h4>
+<pre class="r"><code>df_Sper01 %&gt;% filter(NegControl) %&gt;%
+  group_by(Sample) %&gt;%
+  summarise(sum(reads))</code></pre>
+<pre><code>## # A tibble: 3 × 2
+##   Sample       `sum(reads)`
+##   &lt;chr&gt;               &lt;dbl&gt;
+## 1 PCRNeg_G1_R1          414
+## 2 PCRNeg_L1_R1         1200
+## 3 PCRNeg_U1_R1         1175</code></pre>
+<pre class="r"><code>df_Sper01 %&gt;% filter(Sample == &quot;PCRNeg_G1_R1&quot;) %&gt;% arrange(-reads) #%&gt;% View</code></pre>
+<pre><code>##          Sample                                                      id
+## 1  PCRNeg_G1_R1 NB501850:740:HW33YAFX3:3:11406:17601:12456_sub[75..124]
+## 2  PCRNeg_G1_R1 NB501850:740:HW33YAFX3:4:11512:21668:10131_sub[75..124]
+## 3  PCRNeg_G1_R1   NB501850:740:HW33YAFX3:2:21208:8035:9153_sub[75..124]
+## 4  PCRNeg_G1_R1 NB501850:740:HW33YAFX3:1:21108:22316:16802_sub[75..124]
+## 5  PCRNeg_G1_R1  NB501850:740:HW33YAFX3:1:11208:11029:17871_sub[27..76]
+## 6  PCRNeg_G1_R1 NB501850:740:HW33YAFX3:4:11405:22035:15942_sub[70..119]
+## 7  PCRNeg_G1_R1  NB501850:740:HW33YAFX3:2:11306:7944:6898_sub[145..194]
+## 8  PCRNeg_G1_R1  NB501850:740:HW33YAFX3:3:21509:6853:5790_sub[228..277]
+## 9  PCRNeg_G1_R1    NB501850:740:HW33YAFX3:3:21409:8007:9367_sub[32..81]
+## 10 PCRNeg_G1_R1  NB501850:740:HW33YAFX3:3:11410:5426:14926_sub[70..119]
+## 11 PCRNeg_G1_R1 NB501850:740:HW33YAFX3:1:11306:20705:16542_sub[70..119]
+## 12 PCRNeg_G1_R1  NB501850:740:HW33YAFX3:1:21201:10765:3418_sub[73..122]
+## 13 PCRNeg_G1_R1  NB501850:740:HW33YAFX3:4:21406:25646:9119_sub[70..119]
+## 14 PCRNeg_G1_R1 NB501850:740:HW33YAFX3:2:11301:18823:10044_sub[75..124]
+## 15 PCRNeg_G1_R1   NB501850:740:HW33YAFX3:2:11204:12481:1266_sub[27..76]
+## 16 PCRNeg_G1_R1  NB501850:740:HW33YAFX3:4:11410:2614:14231_sub[75..124]
+## 17 PCRNeg_G1_R1  NB501850:740:HW33YAFX3:1:11104:19154:6824_sub[70..119]
+## 18 PCRNeg_G1_R1  NB501850:740:HW33YAFX3:4:21601:12544:2512_sub[75..124]
+## 19 PCRNeg_G1_R1  NB501850:740:HW33YAFX3:1:11306:12946:5656_sub[75..124]
+## 20 PCRNeg_G1_R1  NB501850:740:HW33YAFX3:2:11312:1851:18016_sub[75..124]
+## 21 PCRNeg_G1_R1  NB501850:740:HW33YAFX3:1:11312:1888:12500_sub[75..124]
+##    obiclean_weight reads                                           sequence
+## 1              414   391 ccgacgcgcccacgtcgcgggcggacgctccgaccgacgcacctgcggca
+## 2                2     2 ccgacgcgcccacgtcgcgggcggacgccccgaccgacgcacctgcggca
+## 3                2     2 ccgacgcgcccacgtcgcgggcggacgctccaaccgacgcacctgcggca
+## 4                2     2 ccgacgcgcccacgccgcgggcggacgctccgaccgacgcacctgcggca
+## 5                1     1 ccgacgtgcccacgtcgcgggcggacgctccgaccgacgcacctgcggca
+## 6                1     1 ccgacgcgcccacgtcgcgggcggacgctccgaccgacgcacctgtggca
+## 7                1     1 ccgacgcgcccacggcgcgggcggacgctccgaccgacgcacctgcggca
+## 8                1     1 ccgacgcgcccacgtcgcgggcggacgctccgaccgacgcacctgctgca
+## 9                1     1 ccgacgcgcccacgtcgcgggcggacgctccgaccgacacacctgcggca
+## 10               1     1 ccgacgctcccacgtcgcgggcggacgctccgaccgacgcacctgcggca
+## 11               1     1 ccgacgcgcccacgtcgcgggcggacgctccgaccgacgcacctgcgkca
+## 12               1     1 ccgacgcgcctacgtcgcgggcggacgctccgaccgacgcacctgcggca
+## 13               1     1 ccgacgcgcccacgtcgcgggcggacgctccgaccgacgtacctgcggca
+## 14               1     1 ccgacgcgcccacgtcgcgggcggacgctccgatcgacgcacctgcggca
+## 15               1     1 ccgacgcgcccacgtcgcgggcggacgctccgaccgacgcgcctgcggca
+## 16               1     1 ccgacgcgcccacgtcgcgggcggacgctccgaacgacgcacctgcggca
+## 17               1     1 cctacgcgcccacgtcgcgggcggacgctccgaccgacgcacctgcggca
+## 18               1     1 ccgtcgcgcccacgtcgcgggcggacgctccgaccgacgcacctgcggca
+## 19               1     1 ccgacgcgcccacgtcgcgggcggasgctccgaccgacgcacctgcggca
+## 20               1     1 ccgmcgcgcccacgtcgcgggcggacgctccgaccgacgcacctgcggca
+## 21               1     1 ccgacgcgcccacgtcgcgggcggacgctccgaccgacgsacctgcggca
+##    Community NegControl Spike_level total_count_sample count seq_rank
+## 1          G       TRUE           1                414   391      128
+## 2          G       TRUE           1                414     2     6931
+## 3          G       TRUE           1                414     2     6932
+## 4          G       TRUE           1                414     2     6930
+## 5          G       TRUE           1                414     1    11796
+## 6          G       TRUE           1                414     1    11788
+## 7          G       TRUE           1                414     1    11783
+## 8          G       TRUE           1                414     1    11787
+## 9          G       TRUE           1                414     1    11785
+## 10         G       TRUE           1                414     1    11795
+## 11         G       TRUE           1                414     1    11786
+## 12         G       TRUE           1                414     1    11794
+## 13         G       TRUE           1                414     1    11791
+## 14         G       TRUE           1                414     1    11792
+## 15         G       TRUE           1                414     1    11789
+## 16         G       TRUE           1                414     1    11784
+## 17         G       TRUE           1                414     1    11799
+## 18         G       TRUE           1                414     1    11798
+## 19         G       TRUE           1                414     1    11793
+## 20         G       TRUE           1                414     1    11797
+## 21         G       TRUE           1                414     1    11790
+##    species_name length gc_content
+## 1           128     NA         NA
+## 2          6931     NA         NA
+## 3          6932     NA         NA
+## 4          6930     NA         NA
+## 5         11796     NA         NA
+## 6         11788     NA         NA
+## 7         11783     NA         NA
+## 8         11787     NA         NA
+## 9         11785     NA         NA
+## 10        11795     NA         NA
+## 11        11786     NA         NA
+## 12        11794     NA         NA
+## 13        11791     NA         NA
+## 14        11792     NA         NA
+## 15        11789     NA         NA
+## 16        11784     NA         NA
+## 17        11799     NA         NA
+## 18        11798     NA         NA
+## 19        11793     NA         NA
+## 20        11797     NA         NA
+## 21        11790     NA         NA</code></pre>
+<pre class="r"><code>df_Sper01 %&gt;% filter(Sample == &quot;PCRNeg_L1_R1&quot;) %&gt;% arrange(-reads) #%&gt;% View</code></pre>
+<pre><code>##           Sample                                                       id
+## 1   PCRNeg_L1_R1  NB501850:740:HW33YAFX3:2:21102:10167:14869_sub[67..117]
+## 2   PCRNeg_L1_R1  NB501850:740:HW33YAFX3:4:11512:10596:16733_sub[51..118]
+## 3   PCRNeg_L1_R1   NB501850:740:HW33YAFX3:4:11401:26201:16458_sub[34..83]
+## 4   PCRNeg_L1_R1    NB501850:740:HW33YAFX3:4:11403:4367:5457_sub[79..117]
+## 5   PCRNeg_L1_R1   NB501850:740:HW33YAFX3:4:11507:5710:12149_sub[68..117]
+## 6   PCRNeg_L1_R1  NB501850:740:HW33YAFX3:3:21510:13743:17784_sub[67..117]
+## 7   PCRNeg_L1_R1  NB501850:740:HW33YAFX3:4:21507:12475:10019_sub[72..122]
+## 8   PCRNeg_L1_R1   NB501850:740:HW33YAFX3:3:21407:21752:9242_sub[72..122]
+## 9   PCRNeg_L1_R1  NB501850:740:HW33YAFX3:1:21310:14672:12558_sub[67..117]
+## 10  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:2:11110:17125:14920_sub[73..123]
+## 11  PCRNeg_L1_R1    NB501850:740:HW33YAFX3:1:21101:7611:1789_sub[57..124]
+## 12  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:3:11608:13181:7560_sub[51..118]
+## 13  PCRNeg_L1_R1    NB501850:740:HW33YAFX3:1:21206:6380:6539_sub[72..122]
+## 14  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:4:21507:9654:14019_sub[52..119]
+## 15  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:2:21201:10055:12669_sub[55..122]
+## 16  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:3:21611:4639:18917_sub[227..277]
+## 17  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:4:11608:25147:19555_sub[68..118]
+## 18  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:4:11409:23035:16620_sub[72..122]
+## 19  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:2:11208:24076:13172_sub[72..122]
+## 20  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:4:21502:21867:3908_sub[73..123]
+## 21  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:2:21311:10517:19201_sub[69..119]
+## 22  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:4:21512:12262:17404_sub[68..118]
+## 23  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:4:21508:13899:2231_sub[68..118]
+## 24  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:2:21208:12366:7632_sub[73..123]
+## 25  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:4:11402:25197:14527_sub[55..122]
+## 26  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:1:11301:13539:13773_sub[52..119]
+## 27  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:1:11103:5587:20050_sub[50..117]
+## 28  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:1:21204:11932:10138_sub[57..124]
+## 29  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:3:21405:23613:3607_sub[55..122]
+## 30  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:4:21402:18057:18170_sub[57..124]
+## 31  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:1:21103:19331:5978_sub[51..118]
+## 32  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:2:11212:24805:14793_sub[68..118]
+## 33  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:3:21504:16443:12128_sub[74..124]
+## 34  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:2:21102:20303:6044_sub[51..118]
+## 35  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:1:21312:26450:8967_sub[68..117]
+## 36  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:2:21205:22929:13743_sub[34..83]
+## 37  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:1:21307:15502:6906_sub[68..117]
+## 38  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:1:11205:17806:8500_sub[147..196]
+## 39  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:3:21504:20226:16554_sub[72..122]
+## 40  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:1:11304:15871:4034_sub[56..122]
+## 41  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:2:21106:24001:9447_sub[68..118]
+## 42  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:2:11205:10265:18661_sub[29..79]
+## 43  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:4:11610:8772:12092_sub[68..118]
+## 44  PCRNeg_L1_R1    NB501850:740:HW33YAFX3:2:21301:3446:5004_sub[74..124]
+## 45  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:4:21405:16373:4127_sub[227..277]
+## 46  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:4:21606:22921:5942_sub[73..123]
+## 47  PCRNeg_L1_R1    NB501850:740:HW33YAFX3:2:21210:7877:8718_sub[72..122]
+## 48  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:1:21305:9020:16604_sub[51..118]
+## 49  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:3:11508:3724:12029_sub[55..122]
+## 50  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:2:21305:13357:11629_sub[51..118]
+## 51  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:4:21403:8062:12973_sub[72..122]
+## 52  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:4:21501:14927:15698_sub[50..117]
+## 53  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:2:11311:21955:2456_sub[74..124]
+## 54  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:2:11209:22795:10876_sub[69..119]
+## 55  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:2:21106:6564:19124_sub[34..101]
+## 56  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:1:21111:18546:2586_sub[56..123]
+## 57  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:2:11311:10351:1952_sub[68..118]
+## 58  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:4:21607:20806:4861_sub[56..123]
+## 59  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:3:21507:26717:9993_sub[57..124]
+## 60  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:1:21109:21891:18267_sub[69..119]
+## 61  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:1:21103:1196:10662_sub[73..123]
+## 62  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:2:21112:25775:7786_sub[57..124]
+## 63  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:2:11211:12753:12698_sub[67..117]
+## 64  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:2:21308:26369:13796_sub[68..118]
+## 65  PCRNeg_L1_R1    NB501850:740:HW33YAFX3:2:21209:3304:4712_sub[52..119]
+## 66  PCRNeg_L1_R1    NB501850:740:HW33YAFX3:1:21212:2801:8402_sub[68..118]
+## 67  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:1:11308:11095:11372_sub[55..122]
+## 68  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:4:21509:3361:19515_sub[67..117]
+## 69  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:4:21603:24254:6824_sub[68..118]
+## 70  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:2:21203:22858:3648_sub[74..124]
+## 71  PCRNeg_L1_R1    NB501850:740:HW33YAFX3:4:21604:7827:17180_sub[34..84]
+## 72  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:2:11104:15389:8307_sub[73..123]
+## 73  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:3:21603:20872:10282_sub[68..118]
+## 74  PCRNeg_L1_R1    NB501850:740:HW33YAFX3:1:11110:6408:6148_sub[50..117]
+## 75  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:1:11309:20179:6421_sub[67..117]
+## 76  PCRNeg_L1_R1    NB501850:740:HW33YAFX3:1:11104:5587:2381_sub[50..117]
+## 77  PCRNeg_L1_R1    NB501850:740:HW33YAFX3:1:11305:11979:5880_sub[34..84]
+## 78  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:4:21605:10095:12658_sub[50..117]
+## 79  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:4:21609:15402:19973_sub[72..122]
+## 80  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:1:11102:14556:14836_sub[50..117]
+## 81  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:1:11107:26452:5851_sub[210..277]
+## 82  PCRNeg_L1_R1 NB501850:740:HW33YAFX3:1:21212:24510:10267_sub[136..203]
+## 83  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:4:11502:18387:9383_sub[50..117]
+## 84  PCRNeg_L1_R1    NB501850:740:HW33YAFX3:1:11312:1526:7089_sub[56..123]
+## 85  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:3:21403:14361:9841_sub[68..118]
+## 86  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:4:11406:25882:7691_sub[138..205]
+## 87  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:1:11106:12151:14227_sub[51..118]
+## 88  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:3:11508:11542:11264_sub[51..118]
+## 89  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:2:11105:11795:2644_sub[50..117]
+## 90  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:1:11112:1730:14306_sub[51..118]
+## 91  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:1:21208:2883:10368_sub[72..122]
+## 92  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:3:21411:12136:15435_sub[51..118]
+## 93  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:3:11609:7020:3610_sub[143..169]
+## 94  PCRNeg_L1_R1    NB501850:740:HW33YAFX3:1:11109:1044:18907_sub[27..94]
+## 95  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:1:11109:25530:11984_sub[29..96]
+## 96  PCRNeg_L1_R1   NB501850:740:HW33YAFX3:1:21104:25434:8573_sub[50..117]
+## 97  PCRNeg_L1_R1 NB501850:740:HW33YAFX3:2:21304:12757:12720_sub[210..277]
+## 98  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:2:21307:23739:11192_sub[67..117]
+## 99  PCRNeg_L1_R1  NB501850:740:HW33YAFX3:2:11209:8453:10093_sub[136..170]
+## 100 PCRNeg_L1_R1    NB501850:740:HW33YAFX3:4:21405:15761:1817_sub[27..94]
+## 101 PCRNeg_L1_R1 NB501850:740:HW33YAFX3:2:11203:10682:19129_sub[140..170]
+## 102 PCRNeg_L1_R1  NB501850:740:HW33YAFX3:1:21106:20301:17030_sub[52..119]
+## 103 PCRNeg_L1_R1   NB501850:740:HW33YAFX3:4:11511:3404:11894_sub[57..124]
+## 104 PCRNeg_L1_R1    NB501850:740:HW33YAFX3:2:21210:22060:8688_sub[27..77]
+## 105 PCRNeg_L1_R1   NB501850:740:HW33YAFX3:3:21601:18406:11768_sub[34..84]
+## 106 PCRNeg_L1_R1   NB501850:740:HW33YAFX3:2:11104:2993:2530_sub[229..277]
+## 107 PCRNeg_L1_R1    NB501850:740:HW33YAFX3:3:21508:26430:2387_sub[33..82]
+## 108 PCRNeg_L1_R1  NB501850:740:HW33YAFX3:2:11205:15104:19472_sub[69..119]
+## 109 PCRNeg_L1_R1  NB501850:740:HW33YAFX3:1:11211:16373:8326_sub[134..184]
+## 110 PCRNeg_L1_R1  NB501850:740:HW33YAFX3:2:11311:21923:15260_sub[75..124]
+## 111 PCRNeg_L1_R1   NB501850:740:HW33YAFX3:1:11308:3689:13735_sub[50..117]
+## 112 PCRNeg_L1_R1   NB501850:740:HW33YAFX3:4:21509:5716:4701_sub[147..175]
+##     obiclean_weight reads
+## 1               533   460
+## 2               408   346
+## 3               235   227
+## 4                 8     8
+## 5                 9     6
+## 6                 5     4
+## 7                 4     4
+## 8                 4     4
+## 9                 3     3
+## 10                3     3
+## 11                3     3
+## 12                3     3
+## 13                3     3
+## 14                3     3
+## 15                4     3
+## 16                2     2
+## 17                2     2
+## 18                2     2
+## 19                2     2
+## 20                2     2
+## 21                2     2
+## 22                2     2
+## 23                2     2
+## 24                2     2
+## 25                2     2
+## 26                2     2
+## 27                3     2
+## 28                2     2
+## 29                2     2
+## 30                2     2
+## 31                2     2
+## 32                2     2
+## 33                2     2
+## 34                2     2
+## 35                2     2
+## 36                2     2
+## 37                2     2
+## 38                2     2
+## 39                1     1
+## 40                1     1
+## 41                1     1
+## 42                1     1
+## 43                1     1
+## 44                1     1
+## 45                1     1
+## 46                1     1
+## 47                1     1
+## 48                1     1
+## 49                1     1
+## 50                1     1
+## 51                1     1
+## 52                1     1
+## 53                1     1
+## 54                1     1
+## 55                1     1
+## 56                1     1
+## 57                1     1
+## 58                1     1
+## 59                1     1
+## 60                1     1
+## 61                1     1
+## 62                1     1
+## 63                1     1
+## 64                1     1
+## 65                1     1
+## 66                1     1
+## 67                1     1
+## 68                1     1
+## 69                1     1
+## 70                1     1
+## 71                1     1
+## 72                1     1
+## 73                1     1
+## 74                1     1
+## 75                1     1
+## 76                1     1
+## 77                1     1
+## 78                1     1
+## 79                1     1
+## 80                1     1
+## 81                1     1
+## 82                1     1
+## 83                1     1
+## 84                1     1
+## 85                1     1
+## 86                1     1
+## 87                1     1
+## 88                1     1
+## 89                1     1
+## 90                1     1
+## 91                1     1
+## 92                1     1
+## 93                1     1
+## 94                1     1
+## 95                1     1
+## 96                1     1
+## 97                1     1
+## 98                1     1
+## 99                1     1
+## 100               1     1
+## 101               1     1
+## 102               1     1
+## 103               1     1
+## 104               1     1
+## 105               1     1
+## 106               1     1
+## 107               1     1
+## 108               1     1
+## 109               1     1
+## 110               1     1
+## 111               1     1
+## 112               1     1
+##                                                                 sequence
+## 1                    atcccgttttatgaaaacaaacaaggtttcagaaagcgagaataaataaag
+## 2   atcctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 3                     atccggttttctgacaataacaaaaggttcagaaagcgaaaatcaaaaag
+## 4                                atcctgggttacgcgaacaaaccagagtttagaaagcgg
+## 5                     accctcagcctcgcccaaggttgaattatgaaacctgtgacggtcgggtc
+## 6                    atcccgttttatgaagacaaacaaggtttcagaaagcgagaataaataaag
+## 7                    atcccgttttatgaaaacaaacaaggcttcagaaagcgagaataaataaag
+## 8                    atcccgttttatgaaaacagacaaggtttcagaaagcgagaataaataaag
+## 9                    atcccgttttatggaaacaaacaaggtttcagaaagcgagaataaataaag
+## 10                   atcccgttttatgaaaacaaacaaggtttcagaaagcgaggataaataaag
+## 11  atcctatttttcgaaaacaaacaaagaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 12  atcctatttctcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 13                   atcccgttttatgaaaacaaacaaggtttcaaaaagcgagaataaataaag
+## 14  atcctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacgaaag
+## 15  atcctatttttcggaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 16                   atcccgttttatgagaacaaacaaggtttcagaaagcgagaataaataaag
+## 17                   atcccgttttatgaaaacaaacaaggtttcagaaagcgggaataaataaag
+## 18                   accccgttttatgaaaacaaacaaggtttcagaaagcgagaataaataaag
+## 19                   atcccgttttatgaaaacaaacaaggttccagaaagcgagaataaataaag
+## 20                   atcccgctttatgaaaacaaacaaggtttcagaaagcgagaataaataaag
+## 21                   atcccgttttatgaaaacaaacaaggtttcagaaagcgagaataaataagg
+## 22                   atcccgtcttatgaaaacaaacaaggtttcagaaagcgagaataaataaag
+## 23                   atcccgttctatgaaaacaaacaaggtttcagaaagcgagaataaataaag
+## 24                   atcccgttttacgaaaacaaacaaggtttcagaaagcgagaataaataaag
+## 25  atcctatttttcgagaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 26  atcctatttttcgaaaacaagcaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 27  atcctattcttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 28  accctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 29  atcctattttccgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 30  atcctatttttcgaaaacaaacaaaaaaacagacaaaggttcataaagacagaataagaatacaaaag
+## 31  atcctatttttcgaaaacaaacaaaaaaacaaacagaggttcataaagacagaataagaatacaaaag
+## 32                   atcccgttttatgaaaacaaacaaggtttcagaaagctagaataaataaag
+## 33                   atcccgttttatgaaaacaaacaaggtttaagaaagcgagaataaataaag
+## 34  atcctatttttcgaaaacaaacaaaaaaacaaataaaggttcataaagacagaataagaatacaaaag
+## 35                    atccggttttctgacaataacaaaaggttcagaaagcgaaagtcaaaaag
+## 36                    atccggttttctgacaataacaaaaggctcagaaagcgaaaatcaaaaag
+## 37                    atccggttttctgacaataacaaaaggttcagagagcgaaaatcaaaaag
+## 38                    atccggttttctgacaataacaaaaggttcggaaagcgaaaatcaaaaag
+## 39                   atcccgttttatgaaaacaaacaaggtttcagaaggcgagaataaataaag
+## 40   atcctatttttcgaaaacaaacaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 41                   atcccgttttatgaaaacaaacagggtttcagaaagcgagaataaataaag
+## 42                   atcccgttttatgaaaacaaacaaggtttcaggaagcgagaataaataaag
+## 43                   atcccgttttatgaaagcaaacaaggtttcagaaagcgagaataaataaag
+## 44                   atcccgttttatgaaaacaaacaaggtttcggaaagcgagaataaataaag
+## 45                   atcccgttttatgaaaacaaacaaggtttcagaaagcgagaataaaaaaag
+## 46                   atccagttttatgaaaacaaacaaggtttcagaaagcgagaataaataaag
+## 47                   atcccgttttatgaaaacaaacaaggtttcagaaagcgagaataaatagag
+## 48  atcctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaaggcagaataagaatacaaaag
+## 49  atcctatttttcgaaaacaaacaaaaaaacaaacaaaggctcataaagacagaataagaatacaaaag
+## 50  atcctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataaggatacaaaag
+## 51                   atcccgttttatgaaaacaaacaaggtttcagaaagcgagaatgaataaag
+## 52  atcctgtttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 53                   atcccgttttatgaaaacaaacaaggtttcagaaagcaagaataaataaag
+## 54                   atcccgttttatgaaaacaaacaaggttttagaaagcgagaataaataaag
+## 55  atcctatttttcgaaaacagacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 56  atcctatttttcgaaaacaaacaaaaaagcaaacaaaggttcataaagacagaataagaatacaaaag
+## 57                   atcccgttttatgaaaacaaataaggtttcagaaagcgagaataaataaag
+## 58  atcctatttttcgaaaacaaacaagaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 59  atcctatttttcgaaaacaaacaaaaaaacaaacaaaggttcgtaaagacagaataagaatacaaaag
+## 60                   atctcgttttatgaaaacaaacaaggtttcagaaagcgagaataaataaag
+## 61                   atcccgttttataaaaacaaacaaggtttcagaaagcgagaataaataaag
+## 62  atcctatttttcgaaaacaaacaaaaaaacgaacaaaggttcataaagacagaataagaatacaaaag
+## 63                   atcccgttttatgaaaacaaacaaggtttcagaaagcgtgaataaataaag
+## 64                   atcccgttttatgaaaacaaacaaggtttcagaaagcgagaacaaataaag
+## 65  atcctatctttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 66                   atcccgttttatgaaaacaaactaggtttcagaaagcgagaataaataaag
+## 67  atcctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaatg
+## 68                   atcccgttttatgaaaacaaacaaggtttcagaaagcgagaataaataaaa
+## 69                   atcccgttttatgaaaacaaacaaggtttcagaaagcgagaatatataaag
+## 70                   atcccgttttatgaaaacatacaaggtttcagaaagcgagaataaataaag
+## 71                   atcccgttttatgaaaacaaacaaggtatcagaaagcgagaataaataaag
+## 72                   atcccgttttatgaaaacaaacaaggtttcagaaagcgagaattaataaag
+## 73                   atcccgwtttatgaaaacaaacaaggtttcagaaagcgagaataaataaag
+## 74  atcctatttttcgaaaacaaacaaaaaaacaaacaaagattcataaagacagaataagaatacaaaag
+## 75                   atcccgttttatgaaatcaaacaaggtttcagaaagcgagaataaataaag
+## 76  atcctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaak
+## 77                   atcccgtkttatgaaaacaaacaaggtttcagaaagcgagaataaataaag
+## 78  atcctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacataataagaatacaaaag
+## 79                   atcccgtattatgaaaacaaacaaggtttcagaaagcgagaataaataaag
+## 80  atcctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagtcagaataagaatacaaaag
+## 81  atcctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaaaaagaatacaaaag
+## 82  atcctatttttcgaaaacaaacaaaaaaacaaacaacggttcataaagacagaataagaatacaaaag
+## 83  atcctatttttcgaaaactaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 84  atcctatttttcgaaaacaaacaaaaaaacaaaaaaaggttcataaagacagaataagaatacaaaag
+## 85                   awcccgttttatgaaaacaaacaaggtttcagaaagcgagaataaataaag
+## 86  atcctatttttcgaaaacaaacaaaaaaacaaccaaaggttcataaagacagaataagaatacaaaag
+## 87  atmctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 88  atcctatttttcgaaaacaaacaaaaaaacaaacaaagggtcataaagacagaataagaatacaaaag
+## 89  atcctatttttcgaaaacaaacaaaaaaacatacaaaggttcataaagacagaataagaatacaaaag
+## 90  atcctatwtttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 91                   atcccgttttatgaaaacaaacaaggtttcagaaagcgagaataaatamag
+## 92  atcctatttttcgaaaacaaacaaaaaaacacacaaaggttcataaagacagaataagaatacaaaag
+## 93                                                     atcccgtttaaataaag
+## 94  atcctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaagaagaatacaaaag
+## 95  atcctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagamtacaaaag
+## 96  atcctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacacaataagaatacaaaag
+## 97  atcctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatccaaaag
+## 98                   atcccgttttatgaaaacaascaaggtttcagaaagcgagaataaataaag
+## 99                                             atcccgttttatgaaataaataaag
+## 100 atcctatttttcgaaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacmaaag
+## 101                                                atcccgttttaataaataaag
+## 102 atcctatttttcgkaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 103 atcctattcttcgaaaacaaacaaaaaaacaaacaaaagttcataaagacagaataagaatacaaaag
+## 104                  atcccgttttattaaaacaaacaaggtttaagaaagcgagaataaataaaa
+## 105                  atcccgatttatgaaaacaaacaagttttcagaaagcgagaataaataaag
+## 106                    accctcagcctcgcccaaggttgaattatgaacctgtgacggtcgggtc
+## 107                   accctcagactcgcccaaggttgaattatgaaacctgtgacggtcgggtc
+## 108                  atcccgttttatgaagacaaacaaggtttcaggaagcgagaataaataaag
+## 109                  atcccgtkttatgaaaacaaacaaggattcagaaagcgagaataaataaag
+## 110                   accctcagcctcgcccaaggttgaattatgaaacccgtgacggtcgggtc
+## 111 accctatttttcggaaacaaacaaaaaaacaaacaaaggttcataaagacagaataagaatacaaaag
+## 112                                        atcccgttttatgaannnnnnnnnnaaag
+##     Community NegControl Spike_level total_count_sample  count seq_rank
+## 1           T       TRUE           1               1200 569364        1
+## 2           T       TRUE           1               1200 225012        4
+## 3           T       TRUE           1               1200    228      235
+## 4           T       TRUE           1               1200      8     2557
+## 5           T       TRUE           1               1200     29     1280
+## 6           T       TRUE           1               1200   1241       27
+## 7           T       TRUE           1               1200   1137       31
+## 8           T       TRUE           1               1200    776       53
+## 9           T       TRUE           1               1200   1097       33
+## 10          T       TRUE           1               1200   1077       35
+## 11          T       TRUE           1               1200    358      146
+## 12          T       TRUE           1               1200    344      154
+## 13          T       TRUE           1               1200    269      203
+## 14          T       TRUE           1               1200    245      221
+## 15          T       TRUE           1               1200    214      245
+## 16          T       TRUE           1               1200   1234       28
+## 17          T       TRUE           1               1200    987       40
+## 18          T       TRUE           1               1200    888       44
+## 19          T       TRUE           1               1200    876       45
+## 20          T       TRUE           1               1200    820       50
+## 21          T       TRUE           1               1200    754       54
+## 22          T       TRUE           1               1200    748       55
+## 23          T       TRUE           1               1200    649       64
+## 24          T       TRUE           1               1200    566       81
+## 25          T       TRUE           1               1200    464       99
+## 26          T       TRUE           1               1200    378      137
+## 27          T       TRUE           1               1200    360      145
+## 28          T       TRUE           1               1200    344      152
+## 29          T       TRUE           1               1200    320      173
+## 30          T       TRUE           1               1200    289      190
+## 31          T       TRUE           1               1200    279      195
+## 32          T       TRUE           1               1200    249      218
+## 33          T       TRUE           1               1200    196      266
+## 34          T       TRUE           1               1200    100      556
+## 35          T       TRUE           1               1200      2     5399
+## 36          T       TRUE           1               1200      2     5398
+## 37          T       TRUE           1               1200      2     5400
+## 38          T       TRUE           1               1200      2     5401
+## 39          T       TRUE           1               1200   1200       29
+## 40          T       TRUE           1               1200   1020       37
+## 41          T       TRUE           1               1200    966       41
+## 42          T       TRUE           1               1200    937       42
+## 43          T       TRUE           1               1200    929       43
+## 44          T       TRUE           1               1200    873       47
+## 45          T       TRUE           1               1200    805       51
+## 46          T       TRUE           1               1200    729       58
+## 47          T       TRUE           1               1200    572       78
+## 48          T       TRUE           1               1200    479       96
+## 49          T       TRUE           1               1200    476       97
+## 50          T       TRUE           1               1200    434      106
+## 51          T       TRUE           1               1200    432      109
+## 52          T       TRUE           1               1200    425      112
+## 53          T       TRUE           1               1200    357      147
+## 54          T       TRUE           1               1200    353      148
+## 55          T       TRUE           1               1200    331      164
+## 56          T       TRUE           1               1200    329      165
+## 57          T       TRUE           1               1200    318      176
+## 58          T       TRUE           1               1200    294      186
+## 59          T       TRUE           1               1200    293      187
+## 60          T       TRUE           1               1200    279      196
+## 61          T       TRUE           1               1200    271      202
+## 62          T       TRUE           1               1200    267      206
+## 63          T       TRUE           1               1200    255      214
+## 64          T       TRUE           1               1200    255      213
+## 65          T       TRUE           1               1200    253      215
+## 66          T       TRUE           1               1200    243      223
+## 67          T       TRUE           1               1200    223      237
+## 68          T       TRUE           1               1200    210      248
+## 69          T       TRUE           1               1200    173      310
+## 70          T       TRUE           1               1200    146      375
+## 71          T       TRUE           1               1200    139      399
+## 72          T       TRUE           1               1200    133      417
+## 73          T       TRUE           1               1200    129      433
+## 74          T       TRUE           1               1200    120      459
+## 75          T       TRUE           1               1200    105      521
+## 76          T       TRUE           1               1200    104      532
+## 77          T       TRUE           1               1200     82      647
+## 78          T       TRUE           1               1200     80      662
+## 79          T       TRUE           1               1200     70      722
+## 80          T       TRUE           1               1200     66      758
+## 81          T       TRUE           1               1200     63      782
+## 82          T       TRUE           1               1200     61      796
+## 83          T       TRUE           1               1200     59      819
+## 84          T       TRUE           1               1200     50      911
+## 85          T       TRUE           1               1200     50      922
+## 86          T       TRUE           1               1200     39     1097
+## 87          T       TRUE           1               1200     36     1159
+## 88          T       TRUE           1               1200     32     1216
+## 89          T       TRUE           1               1200     26     1382
+## 90          T       TRUE           1               1200     23     1486
+## 91          T       TRUE           1               1200     19     1626
+## 92          T       TRUE           1               1200     16     1811
+## 93          T       TRUE           1               1200     11     2163
+## 94          T       TRUE           1               1200      8     2535
+## 95          T       TRUE           1               1200      8     2537
+## 96          T       TRUE           1               1200      8     2534
+## 97          T       TRUE           1               1200      6     2915
+## 98          T       TRUE           1               1200      6     2867
+## 99          T       TRUE           1               1200      5     3122
+## 100         T       TRUE           1               1200      5     3190
+## 101         T       TRUE           1               1200      4     3433
+## 102         T       TRUE           1               1200      4     3605
+## 103         T       TRUE           1               1200      2     5657
+## 104         T       TRUE           1               1200      2     5303
+## 105         T       TRUE           1               1200      2     4963
+## 106         T       TRUE           1               1200      1     7186
+## 107         T       TRUE           1               1200      1     7181
+## 108         T       TRUE           1               1200      1     8179
+## 109         T       TRUE           1               1200      1     7617
+## 110         T       TRUE           1               1200      1     7182
+## 111         T       TRUE           1               1200      1     7180
+## 112         T       TRUE           1               1200      1     8187
+##        species_name length gc_content
+## 1       Rosa_canina     51   31.37255
+## 2   Populus_tremula     68   25.00000
+## 3               235     NA         NA
+## 4              2557     NA         NA
+## 5              1280     NA         NA
+## 6                27     NA         NA
+## 7                31     NA         NA
+## 8                53     NA         NA
+## 9                33     NA         NA
+## 10               35     NA         NA
+## 11              146     NA         NA
+## 12              154     NA         NA
+## 13              203     NA         NA
+## 14              221     NA         NA
+## 15              245     NA         NA
+## 16               28     NA         NA
+## 17               40     NA         NA
+## 18               44     NA         NA
+## 19               45     NA         NA
+## 20               50     NA         NA
+## 21               54     NA         NA
+## 22               55     NA         NA
+## 23               64     NA         NA
+## 24               81     NA         NA
+## 25               99     NA         NA
+## 26              137     NA         NA
+## 27              145     NA         NA
+## 28              152     NA         NA
+## 29              173     NA         NA
+## 30              190     NA         NA
+## 31              195     NA         NA
+## 32              218     NA         NA
+## 33              266     NA         NA
+## 34              556     NA         NA
+## 35             5399     NA         NA
+## 36             5398     NA         NA
+## 37             5400     NA         NA
+## 38             5401     NA         NA
+## 39               29     NA         NA
+## 40               37     NA         NA
+## 41               41     NA         NA
+## 42               42     NA         NA
+## 43               43     NA         NA
+## 44               47     NA         NA
+## 45               51     NA         NA
+## 46               58     NA         NA
+## 47               78     NA         NA
+## 48               96     NA         NA
+## 49               97     NA         NA
+## 50              106     NA         NA
+## 51              109     NA         NA
+## 52              112     NA         NA
+## 53              147     NA         NA
+## 54              148     NA         NA
+## 55              164     NA         NA
+## 56              165     NA         NA
+## 57              176     NA         NA
+## 58              186     NA         NA
+## 59              187     NA         NA
+## 60              196     NA         NA
+## 61              202     NA         NA
+## 62              206     NA         NA
+## 63              214     NA         NA
+## 64              213     NA         NA
+## 65              215     NA         NA
+## 66              223     NA         NA
+## 67              237     NA         NA
+## 68              248     NA         NA
+## 69              310     NA         NA
+## 70              375     NA         NA
+## 71              399     NA         NA
+## 72              417     NA         NA
+## 73              433     NA         NA
+## 74              459     NA         NA
+## 75              521     NA         NA
+## 76              532     NA         NA
+## 77              647     NA         NA
+## 78              662     NA         NA
+## 79              722     NA         NA
+## 80              758     NA         NA
+## 81              782     NA         NA
+## 82              796     NA         NA
+## 83              819     NA         NA
+## 84              911     NA         NA
+## 85              922     NA         NA
+## 86             1097     NA         NA
+## 87             1159     NA         NA
+## 88             1216     NA         NA
+## 89             1382     NA         NA
+## 90             1486     NA         NA
+## 91             1626     NA         NA
+## 92             1811     NA         NA
+## 93             2163     NA         NA
+## 94             2535     NA         NA
+## 95             2537     NA         NA
+## 96             2534     NA         NA
+## 97             2915     NA         NA
+## 98             2867     NA         NA
+## 99             3122     NA         NA
+## 100            3190     NA         NA
+## 101            3433     NA         NA
+## 102            3605     NA         NA
+## 103            5657     NA         NA
+## 104            5303     NA         NA
+## 105            4963     NA         NA
+## 106            7186     NA         NA
+## 107            7181     NA         NA
+## 108            8179     NA         NA
+## 109            7617     NA         NA
+## 110            7182     NA         NA
+## 111            7180     NA         NA
+## 112            8187     NA         NA</code></pre>
+<pre class="r"><code>df_Sper01 %&gt;% filter(Sample == &quot;PCRNeg_U1_R1&quot;) %&gt;% arrange(-reads) #%&gt;% View</code></pre>
+<pre><code>##          Sample                                                       id
+## 1  PCRNeg_U1_R1  NB501850:740:HW33YAFX3:1:11211:22181:10196_sub[79..117]
+## 2  PCRNeg_U1_R1   NB501850:740:HW33YAFX3:2:11104:22649:4419_sub[66..117]
+## 3  PCRNeg_U1_R1   NB501850:740:HW33YAFX3:2:11109:15864:3607_sub[84..122]
+## 4  PCRNeg_U1_R1  NB501850:740:HW33YAFX3:1:21103:17427:16658_sub[80..118]
+## 5  PCRNeg_U1_R1   NB501850:740:HW33YAFX3:2:21307:8204:11420_sub[79..117]
+## 6  PCRNeg_U1_R1     NB501850:740:HW33YAFX3:2:11111:3114:1445_sub[27..65]
+## 7  PCRNeg_U1_R1  NB501850:740:HW33YAFX3:4:21511:10066:15816_sub[86..124]
+## 8  PCRNeg_U1_R1   NB501850:740:HW33YAFX3:1:21206:15859:7914_sub[85..123]
+## 9  PCRNeg_U1_R1   NB501850:740:HW33YAFX3:2:21112:23705:2557_sub[81..119]
+## 10 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:2:11110:19785:8663_sub[86..124]
+## 11 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:2:21105:4711:15185_sub[66..117]
+## 12 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:1:11309:18227:14022_sub[71..122]
+## 13 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:2:21302:19502:5179_sub[84..122]
+## 14 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:2:21210:26730:5623_sub[80..118]
+## 15 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:2:11202:9757:15287_sub[84..122]
+## 16 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:4:11605:14953:20107_sub[86..124]
+## 17 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:3:21512:22209:16219_sub[79..117]
+## 18 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:2:21104:22617:8329_sub[81..119]
+## 19 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:4:11409:7671:14889_sub[80..118]
+## 20 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:3:11411:5533:16727_sub[66..117]
+## 21 PCRNeg_U1_R1    NB501850:740:HW33YAFX3:4:11403:2405:4973_sub[66..117]
+## 22 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:3:21401:20453:6166_sub[127..178]
+## 23 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:3:21505:6704:20056_sub[66..117]
+## 24 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:1:11101:21424:18476_sub[72..123]
+## 25 PCRNeg_U1_R1    NB501850:740:HW33YAFX3:3:11509:2457:6122_sub[66..117]
+## 26 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:4:11502:12789:5541_sub[135..186]
+## 27 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:2:11204:4801:14875_sub[80..118]
+## 28 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:1:11108:17132:2797_sub[84..122]
+## 29 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:4:11603:20618:12432_sub[80..118]
+## 30 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:3:11401:17592:7228_sub[79..117]
+## 31 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:1:21207:26065:1587_sub[79..117]
+## 32 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:1:11203:5898:13516_sub[85..123]
+## 33 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:1:11207:17222:17805_sub[85..122]
+## 34 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:1:21109:23584:3799_sub[81..119]
+## 35 PCRNeg_U1_R1    NB501850:740:HW33YAFX3:4:11405:3653:10495_sub[27..65]
+## 36 PCRNeg_U1_R1    NB501850:740:HW33YAFX3:2:11201:8797:1615_sub[81..119]
+## 37 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:1:11209:10341:9946_sub[81..119]
+## 38 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:4:21511:19343:15330_sub[79..117]
+## 39 PCRNeg_U1_R1    NB501850:740:HW33YAFX3:2:11305:2033:10247_sub[28..66]
+## 40 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:1:21201:21783:19142_sub[86..124]
+## 41 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:2:21211:26778:13268_sub[86..124]
+## 42 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:2:11104:18453:10397_sub[86..124]
+## 43 PCRNeg_U1_R1    NB501850:740:HW33YAFX3:4:21401:5047:3953_sub[79..117]
+## 44 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:4:21404:12195:7549_sub[85..123]
+## 45 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:2:21304:23259:6240_sub[81..119]
+## 46 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:4:11508:11367:17161_sub[87..124]
+## 47 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:2:11101:17345:13161_sub[79..117]
+## 48 PCRNeg_U1_R1    NB501850:740:HW33YAFX3:1:11111:4664:6238_sub[80..118]
+## 49 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:2:11204:24526:13939_sub[81..119]
+## 50 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:4:21508:4120:14246_sub[84..122]
+## 51 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:3:11401:10916:1475_sub[86..124]
+## 52 PCRNeg_U1_R1    NB501850:740:HW33YAFX3:3:11510:4294:1408_sub[79..117]
+## 53 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:1:11307:12538:1096_sub[79..117]
+## 54 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:1:11208:22007:5176_sub[79..117]
+## 55 PCRNeg_U1_R1    NB501850:740:HW33YAFX3:4:21412:8059:9484_sub[86..124]
+## 56 PCRNeg_U1_R1    NB501850:740:HW33YAFX3:4:11505:26796:1384_sub[29..67]
+## 57 PCRNeg_U1_R1     NB501850:740:HW33YAFX3:1:11308:3121:4219_sub[32..70]
+## 58 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:1:21108:23494:18071_sub[33..71]
+## 59 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:1:11207:9252:10609_sub[136..168]
+## 60 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:4:21408:25757:19077_sub[84..122]
+## 61 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:1:21109:7957:19119_sub[83..119]
+## 62 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:1:21310:13799:9128_sub[85..122]
+## 63 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:4:21404:4941:11923_sub[239..277]
+## 64 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:3:11412:23715:16677_sub[80..117]
+## 65 PCRNeg_U1_R1    NB501850:740:HW33YAFX3:1:11201:4922:7849_sub[79..117]
+## 66 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:4:21607:12373:14008_sub[28..66]
+## 67 PCRNeg_U1_R1  NB501850:740:HW33YAFX3:4:21402:18804:11880_sub[79..117]
+## 68 PCRNeg_U1_R1    NB501850:740:HW33YAFX3:4:21404:12167:3501_sub[29..67]
+## 69 PCRNeg_U1_R1 NB501850:740:HW33YAFX3:4:11511:14234:13783_sub[140..172]
+## 70 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:4:11410:6293:14524_sub[79..117]
+## 71 PCRNeg_U1_R1   NB501850:740:HW33YAFX3:4:11605:17885:8971_sub[86..124]
+##    obiclean_weight reads                                             sequence
+## 1              865   771              atcctgttttcccaaaacaaaggttcagaaagaaaaaag
+## 2              304   284 atcccgttttatgaaaacaaacaaaggtttcagaaaccgagaataaataaag
+## 3               15    15              atcctgttttcccaaaacaaaggttcaggaagaaaaaag
+## 4                4     4              atcccgttttcccaaaacaaaggttcagaaagaaaaaag
+## 5                4     4              atcctgttttcccaaaacaaaggctcagaaagaaaaaag
+## 6                4     4              atcctgtttccccaaaacaaaggttcagaaagaaaaaag
+## 7                4     4              atcctgttttcccaaagcaaaggttcagaaagaaaaaag
+## 8                4     4              accctgttttcccaaaacaaaggttcagaaagaaaaaag
+## 9                3     3              atcctgttttcccaaaacaaaggttcagaaggaaaaaag
+## 10               3     3              atcctgctttcccaaaacaaaggttcagaaagaaaaaag
+## 11               3     3 atcccgttttatgaaaacaaacagaggtttcagaaaccgagaataaataaag
+## 12               3     3 atcccgttttatgaaaacaaacaaaggtctcagaaaccgagaataaataaag
+## 13               2     2              atcctgttttcccaaaacaaaggttcagaaagaaaaagg
+## 14               2     2              atcctgttttcccaaaacaaaggttcagaaaggaaaaag
+## 15               2     2              atcctgttttcccaaaacaagggttcagaaagaaaaaag
+## 16               2     2              atcctgttttcccaaaacaaaggttcagaaagaaagaag
+## 17               2     2              atcctgttttcccaaaacaaaggttctgaaagaaaaaag
+## 18               2     2              atcctgttttcccaaaactaaggttcagaaagaaaaaag
+## 19               2     2              atcctgtwttcccaaaacaaaggttcagaaagaaaaaag
+## 20               2     2 atcccgttttatgaaaacaaacaaaggtttcagaaaccgagattaaataaag
+## 21               2     2 atcccgttttatgaaaacaaacaaaggtttcaggaaccgagaataaataaag
+## 22               2     2 atcccgttttatgaaaacaaacaaaggtttcagaaacctagaataaataaag
+## 23               2     2 atcccgttttatgaaaataaacaaaggtttcagaaaccgagaataaataaag
+## 24               2     2 atcccgttttatgaaaacaaacaaaggtttcagaaaccgagaataaataagg
+## 25               2     2 atcccgttttatggaaacaaacaaaggtttcagaaaccgagaataaataaag
+## 26               2     2 atcccgttttatgaaaacaaacaaaggtttcagaaaccgagaatagataaag
+## 27               1     1              gtcctgttttcccaaaacaaaggttcagaaagaaaaaag
+## 28               1     1              atcctgttttcccaaaacaaaggttcagaaagaaaaatg
+## 29               1     1              atcctgttttcccaaaacaaaggttcagaaagagaaaag
+## 30               1     1              atcctgttttcccaaaacaaaggttcagagagaaaaaag
+## 31               1     1              atcctgttttcccaaaacaaaggttcagaaagaagaaag
+## 32               1     1              atcctgttctcccaaaacaaaggttcagaaagaaaaaag
+## 33               1     1               atcctgttttcccaaaacaaaggttcagaaagaaaaag
+## 34               1     1              atcctgttttcccaaaacaaaggttcggaaagaaaaaag
+## 35               1     1              atcctgttttcccaagacaaaggttcagaaagaaaaaag
+## 36               1     1              atcctgttttcccaaaacaaaggtccagaaagaaaaaag
+## 37               1     1              atcctgttttcccagaacaaaggttcagaaagaaaaaag
+## 38               1     1              atcctgttttcccaaaacagaggttcagaaagaaaaaag
+## 39               1     1              atcctgttttcccaaaacgaaggttcagaaagaaaaaag
+## 40               1     1              atcctgttttcmcaaaacaaaggttcagaaagaaaaaag
+## 41               1     1              atcctgttttcccaaaacaaaggwtcagaaagaaaaaag
+## 42               1     1              atcctgttttcccaaaacaaaggttaagaaagaaaaaag
+## 43               1     1              atcctgttttcccaaaataaaggttcagaaagaaaaaag
+## 44               1     1              atcctgttttcccaaaacaaagattcagaaagaaaaaag
+## 45               1     1              atcctgttttcccaaaacaatggttcagaaagaaaaaag
+## 46               1     1               atcctgttttccaaaacaaaggttcagaaagaaaaaag
+## 47               1     1              atcctgttttcccaaaacaaaggttcagaatgaaaaaag
+## 48               1     1              atcctgttttcccaaaacaaagtttcagaaagaaaaaag
+## 49               1     1              atcctgwtttcccaaaacaaaggttcagaaagaaaaaag
+## 50               1     1              atcctgttatcccaaaacaaaggttcagaaagaaaaaag
+## 51               1     1              atcctgttttmccaaaacaaaggttcagaaagaaaaaag
+## 52               1     1              atcctgttttcccaaaacaaaggttmagaaagaaaaaag
+## 53               1     1              atcctgttttcccaaaacaaaggttcagaaasaaaaaag
+## 54               1     1              atcctgttttcccaaaacaacggttcagaaagaaaaaag
+## 55               1     1              atcctgttttcccaaaacaaaggttcagaaagaaaaawg
+## 56               1     1              atccggttttcccaaaacaaaggttcagaaagaaaaaag
+## 57               1     1              atcctgttttcccaacacaaaggttcagaaagaaaaaag
+## 58               1     1              atcctgttktcccaaaacaaaggttcagaaagaaaaaag
+## 59               1     1                              atcccgttttatgaaaaataaag
+## 60               1     1              atcctgttttcccaaaacaaagggtcagaaagaaaaaag
+## 61               1     1                cctgttttcccaaaacaaaggttcagaaagaaaaaag
+## 62               1     1               atcctgttttcccaaaacaaaggtcagaaagaaaaaag
+## 63               1     1              atcctgttttcccaaaacaaaggttcagaaagaaaacag
+## 64               1     1               atcctgttttcccaaaacaaaggttcagaaagaaaaat
+## 65               1     1              atcctgttttcccaaaacaaaggttcagaaagaakaaag
+## 66               1     1              atactgttttcccaaaacaaaggttaagaaagaaaaaag
+## 67               1     1              atcctgttttcccaaaacaaaggttcagmaagaaaaaag
+## 68               1     1              atactgttttcccaaaaaaaaggttcagaaagaaaaaag
+## 69               1     1                              atcccgttttagaataaataaag
+## 70               1     1              atcctgttttcwcaaaacaaaggttcagaaagaaaaaag
+## 71               1     1              atcctgttttcccaaaacaamggttcagaaagaaaaaag
+##    Community NegControl Spike_level total_count_sample count seq_rank
+## 1          U       TRUE           1               1175 74496        8
+## 2          U       TRUE           1               1175   284      191
+## 3          U       TRUE           1               1175   141      395
+## 4          U       TRUE           1               1175   152      354
+## 5          U       TRUE           1               1175   152      355
+## 6          U       TRUE           1               1175   145      379
+## 7          U       TRUE           1               1175   141      396
+## 8          U       TRUE           1               1175   125      441
+## 9          U       TRUE           1               1175   142      391
+## 10         U       TRUE           1               1175   131      426
+## 11         U       TRUE           1               1175     3     4057
+## 12         U       TRUE           1               1175     3     4002
+## 13         U       TRUE           1               1175   163      326
+## 14         U       TRUE           1               1175   137      409
+## 15         U       TRUE           1               1175   127      440
+## 16         U       TRUE           1               1175   108      513
+## 17         U       TRUE           1               1175    40     1088
+## 18         U       TRUE           1               1175    27     1360
+## 19         U       TRUE           1               1175    18     1707
+## 20         U       TRUE           1               1175     2     5050
+## 21         U       TRUE           1               1175     2     5052
+## 22         U       TRUE           1               1175     2     5051
+## 23         U       TRUE           1               1175     2     5243
+## 24         U       TRUE           1               1175     2     5048
+## 25         U       TRUE           1               1175     2     5280
+## 26         U       TRUE           1               1175     2     5049
+## 27         U       TRUE           1               1175   598       71
+## 28         U       TRUE           1               1175   546       83
+## 29         U       TRUE           1               1175   160      334
+## 30         U       TRUE           1               1175   143      387
+## 31         U       TRUE           1               1175   130      430
+## 32         U       TRUE           1               1175   123      447
+## 33         U       TRUE           1               1175   112      490
+## 34         U       TRUE           1               1175   112      491
+## 35         U       TRUE           1               1175   106      519
+## 36         U       TRUE           1               1175   100      557
+## 37         U       TRUE           1               1175    88      616
+## 38         U       TRUE           1               1175    68      742
+## 39         U       TRUE           1               1175    54      864
+## 40         U       TRUE           1               1175    44     1017
+## 41         U       TRUE           1               1175    32     1224
+## 42         U       TRUE           1               1175    31     1249
+## 43         U       TRUE           1               1175    29     1300
+## 44         U       TRUE           1               1175    27     1356
+## 45         U       TRUE           1               1175    27     1359
+## 46         U       TRUE           1               1175    25     1424
+## 47         U       TRUE           1               1175    22     1539
+## 48         U       TRUE           1               1175    20     1601
+## 49         U       TRUE           1               1175    19     1661
+## 50         U       TRUE           1               1175    17     1758
+## 51         U       TRUE           1               1175    16     1834
+## 52         U       TRUE           1               1175    16     1832
+## 53         U       TRUE           1               1175    10     2329
+## 54         U       TRUE           1               1175    10     2343
+## 55         U       TRUE           1               1175    10     2326
+## 56         U       TRUE           1               1175     9     2403
+## 57         U       TRUE           1               1175     6     3002
+## 58         U       TRUE           1               1175     6     2970
+## 59         U       TRUE           1               1175     4     3437
+## 60         U       TRUE           1               1175     3     4509
+## 61         U       TRUE           1               1175     3     4740
+## 62         U       TRUE           1               1175     3     4510
+## 63         U       TRUE           1               1175     3     4517
+## 64         U       TRUE           1               1175     2     6434
+## 65         U       TRUE           1               1175     2     6438
+## 66         U       TRUE           1               1175     2     4865
+## 67         U       TRUE           1               1175     2     6445
+## 68         U       TRUE           1               1175     1     7303
+## 69         U       TRUE           1               1175     1     7693
+## 70         U       TRUE           1               1175     1    11196
+## 71         U       TRUE           1               1175     1    10962
+##          species_name length gc_content
+## 1  Fraxinus_excelsior     39   33.33333
+## 2                 191     NA         NA
+## 3                 395     NA         NA
+## 4                 354     NA         NA
+## 5                 355     NA         NA
+## 6                 379     NA         NA
+## 7                 396     NA         NA
+## 8                 441     NA         NA
+## 9                 391     NA         NA
+## 10                426     NA         NA
+## 11               4057     NA         NA
+## 12               4002     NA         NA
+## 13                326     NA         NA
+## 14                409     NA         NA
+## 15                440     NA         NA
+## 16                513     NA         NA
+## 17               1088     NA         NA
+## 18               1360     NA         NA
+## 19               1707     NA         NA
+## 20               5050     NA         NA
+## 21               5052     NA         NA
+## 22               5051     NA         NA
+## 23               5243     NA         NA
+## 24               5048     NA         NA
+## 25               5280     NA         NA
+## 26               5049     NA         NA
+## 27                 71     NA         NA
+## 28                 83     NA         NA
+## 29                334     NA         NA
+## 30                387     NA         NA
+## 31                430     NA         NA
+## 32                447     NA         NA
+## 33                490     NA         NA
+## 34                491     NA         NA
+## 35                519     NA         NA
+## 36                557     NA         NA
+## 37                616     NA         NA
+## 38                742     NA         NA
+## 39                864     NA         NA
+## 40               1017     NA         NA
+## 41               1224     NA         NA
+## 42               1249     NA         NA
+## 43               1300     NA         NA
+## 44               1356     NA         NA
+## 45               1359     NA         NA
+## 46               1424     NA         NA
+## 47               1539     NA         NA
+## 48               1601     NA         NA
+## 49               1661     NA         NA
+## 50               1758     NA         NA
+## 51               1834     NA         NA
+## 52               1832     NA         NA
+## 53               2329     NA         NA
+## 54               2343     NA         NA
+## 55               2326     NA         NA
+## 56               2403     NA         NA
+## 57               3002     NA         NA
+## 58               2970     NA         NA
+## 59               3437     NA         NA
+## 60               4509     NA         NA
+## 61               4740     NA         NA
+## 62               4510     NA         NA
+## 63               4517     NA         NA
+## 64               6434     NA         NA
+## 65               6438     NA         NA
+## 66               4865     NA         NA
+## 67               6445     NA         NA
+## 68               7303     NA         NA
+## 69               7693     NA         NA
+## 70              11196     NA         NA
+## 71              10962     NA         NA</code></pre>
+<p>Open data before filtering (grep, clean)</p>
+<pre class="r"><code># data_Sper01_prev &lt;- read_obifasta(&quot;data/GWM_Sper01.uniq&quot;)
+# 
+# reads &lt;- extract_readcount(data_Sper01_prev)
+# df_reads &lt;- Matrix::summary(reads)
+# df_reads &lt;- data.frame(Sample = rownames(reads)[df_reads$i],
+#            id = colnames(reads)[df_reads$j],
+#            reads = df_reads$x)
+# 
+# df_Sper01 &lt;- Matrix::summary(reads) #&quot;pivot longer&quot;
+# 
+# df_Sper01 &lt;- df_reads %&gt;%
+#   left_join(data_Sper01_prev %&gt;% dplyr::select(id, sequence)) %&gt;%
+#   mutate(Community = substr(Sample, 1, 1),
+#          NegControl = Community == &quot;P&quot;)
+# 
+# df_Sper01[df_Sper01$Community == &quot;P&quot;, &quot;Community&quot;] &lt;- substr(df_Sper01[df_Sper01$Community == &quot;P&quot;,]$Sample, 8, 8)
+# df_Sper01[df_Sper01$Community == &quot;L&quot;, &quot;Community&quot;] &lt;- &quot;T&quot;
+# 
+# df_Sper01$Spike_level &lt;- NA
+# df_Sper01[!df_Sper01$NegControl,&quot;Spike_level&quot;] &lt;- as.numeric(substr(df_Sper01[!df_Sper01$NegControl,]$Sample, 4, 4))
+# 
+# df_Sper01[df_Sper01$NegControl,&quot;Spike_level&quot;] &lt;- as.numeric(substr(df_Sper01[df_Sper01$NegControl,]$Sample, 12, 12))
+# 
+# df_Sper01 &lt;- df_Sper01 %&gt;% filter(Spike_level == 1)
+# 
+# summary_sample &lt;- df_Sper01 %&gt;%
+#   group_by(Sample) %&gt;%
+#   summarise(total_count_sample = sum(reads),
+#             NegControl = NegControl[1],
+#             Spike_level = Spike_level[1],
+#             Community = Community[1]) %&gt;%
+#   arrange(total_count_sample)
+# 
+# summary_sample %&gt;% filter(!NegControl) %&gt;%
+#   pull(total_count_sample) %&gt;% summary</code></pre>
 <p>Export data to Julia for Taqman analysis</p>
 <pre class="r"><code>reads_threshold &lt;- 5000
 
@@ -733,19 +1725,11 @@ auxU &lt;- df_Sper01 %&gt;% filter(Community == &quot;U&quot; &amp;
                           !NegControl) %&gt;%
   filter(species_name %in%
            c(&quot;Fraxinus_excelsior&quot;, &quot;Carpinus_betulus&quot;, &quot;Capsella_bursa-pastoris&quot;)) %&gt;%
-  dplyr::select(species_name, obiclean_weight) %&gt;%
+  dplyr::select(species_name, obiclean_weight, Sample) %&gt;%
   arrange(species_name) %&gt;%
-  pivot_wider(names_from = species_name, values_from = obiclean_weight)</code></pre>
-<pre><code>## Warning: Values from `obiclean_weight` are not uniquely identified; output will contain
-## list-cols.
-## • Use `values_fn = list` to suppress this warning.
-## • Use `values_fn = {summary_fun}` to summarise duplicates.
-## • Use the following dplyr code to identify duplicates.
-##   {data} %&gt;%
-##   dplyr::group_by(species_name) %&gt;%
-##   dplyr::summarise(n = dplyr::n(), .groups = &quot;drop&quot;) %&gt;%
-##   dplyr::filter(n &gt; 1L)</code></pre>
-<pre class="r"><code>matU &lt;- as.matrix(auxU[,-1])
+  pivot_wider(names_from = species_name, values_from = obiclean_weight)
+
+matU &lt;- as.matrix(auxU[,-1])
 # write.csv(matU, &quot;data/dfSper01U_taq.csv&quot;)
 
 ##Commu T
@@ -756,19 +1740,10 @@ auxT &lt;- df_Sper01 %&gt;% filter(Community == &quot;T&quot; &amp;
                           !NegControl) %&gt;%
   filter(species_name %in%
            c(&quot;Fraxinus_excelsior&quot;, &quot;Carpinus_betulus&quot;, &quot;Capsella_bursa-pastoris&quot;)) %&gt;%
-  dplyr::select(species_name, obiclean_weight) %&gt;%
+  dplyr::select(species_name, obiclean_weight, Sample) %&gt;%
   arrange(species_name) %&gt;%
-  pivot_wider(names_from = species_name, values_from = obiclean_weight)</code></pre>
-<pre><code>## Warning: Values from `obiclean_weight` are not uniquely identified; output will contain
-## list-cols.
-## • Use `values_fn = list` to suppress this warning.
-## • Use `values_fn = {summary_fun}` to summarise duplicates.
-## • Use the following dplyr code to identify duplicates.
-##   {data} %&gt;%
-##   dplyr::group_by(species_name) %&gt;%
-##   dplyr::summarise(n = dplyr::n(), .groups = &quot;drop&quot;) %&gt;%
-##   dplyr::filter(n &gt; 1L)</code></pre>
-<pre class="r"><code>matT &lt;- as.matrix(auxT[,-1])
+  pivot_wider(names_from = species_name, values_from = obiclean_weight)
+matT &lt;- as.matrix(auxT[,-1])
 # write.csv(matT, &quot;data/dfSper01T_taq.csv&quot;)
 
 ##Commu G
@@ -779,20 +1754,12 @@ auxG &lt;- df_Sper01 %&gt;% filter(Community == &quot;G&quot; &amp;
                           !NegControl) %&gt;%
   filter(species_name %in%
            c(&quot;Fraxinus_excelsior&quot;, &quot;Carpinus_betulus&quot;, &quot;Capsella_bursa-pastoris&quot;)) %&gt;%
-  dplyr::select(species_name, obiclean_weight) %&gt;%
+  dplyr::select(species_name, obiclean_weight, Sample) %&gt;%
   arrange(species_name) %&gt;%
-  pivot_wider(names_from = species_name, values_from = obiclean_weight)</code></pre>
-<pre><code>## Warning: Values from `obiclean_weight` are not uniquely identified; output will contain
-## list-cols.
-## • Use `values_fn = list` to suppress this warning.
-## • Use `values_fn = {summary_fun}` to summarise duplicates.
-## • Use the following dplyr code to identify duplicates.
-##   {data} %&gt;%
-##   dplyr::group_by(species_name) %&gt;%
-##   dplyr::summarise(n = dplyr::n(), .groups = &quot;drop&quot;) %&gt;%
-##   dplyr::filter(n &gt; 1L)</code></pre>
-<pre class="r"><code>matG &lt;- as.matrix(auxG[,-1])
+  pivot_wider(names_from = species_name, values_from = obiclean_weight)
+matG &lt;- as.matrix(auxG[,-1])
 # write.csv(matG, &quot;data/dfSper01G_taq.csv&quot;)</code></pre>
+</div>
 </div>
 </div>
 <div id="taqman-qpcr" class="section level2">
@@ -813,14 +1780,14 @@ cref_taqman*c(25,5,1,1/5,1/25)</code></pre>
 <pre><code>## [1] 6.211740e-02 1.242348e-02 2.484696e-03 4.969392e-04 9.938784e-05</code></pre>
 <pre class="r"><code>#Copies/ul at cref_taqman in the sample
 taqman[taqman$Sample == 10,]$Cmolecules_ref*cref_taqman/CtotDNA_ref</code></pre>
-<pre><code>## [1] 130.8607</code></pre>
+<pre><code>## [1] 209377</code></pre>
 <pre class="r"><code>Vdna_taq &lt;- 5 #ul
 Vmix_taq &lt;- 25 #ul
 
 #Copies/ul at cref_taqman in the taqman mix
 taqman[taqman$Sample == 10,]$Cmolecules_ref*
   cref_taqman/CtotDNA_ref*Vdna_taq/Vmix_taq</code></pre>
-<pre><code>## [1] 26.17213</code></pre>
+<pre><code>## [1] 41875.41</code></pre>
 <pre class="r"><code>moc_well &lt;- taqman[taqman$Sample == 10,]$Cmolecules_ref*
   cref_taqman*25/CtotDNA_ref*Vdna_taq
 

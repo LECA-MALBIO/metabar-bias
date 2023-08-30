@@ -12,6 +12,8 @@ author:
     institute: leca
   - name: Delphine Rioux
     institute: leca
+  - name: Pierre Taberlet
+    institute: leca
   - name: Christelle Gonindard-Melodelima
     institute: leca
   - name: Eric Coissac
@@ -239,14 +241,14 @@ maxDNA <- 0.25 *Vdna_dd/Vmix_dd #ng/ul
 dataddpcr$TotalDNA <- maxDNA/10^(dataddpcr$Dilu-1)
 
 dataddpcr <- dataddpcr %>%
-  mutate(Concentration_std = Concentration*CtotDNA_ref/TotalDNA)
+  mutate(Concentration_copies_ng = Concentration/TotalDNA)
 
 summary_dd <- dataddpcr %>% filter(Used & Sample < 100) %>%
   group_by(Sample) %>%
   summarise(sp = sp[1],
-            Mean = mean(Concentration*CtotDNA_ref/TotalDNA),
-            min = min(Concentration*CtotDNA_ref/TotalDNA),
-            max = max(Concentration*CtotDNA_ref/TotalDNA)) %>%
+            Mean = mean(Concentration/TotalDNA),
+            min = min(Concentration/TotalDNA),
+            max = max(Concentration/TotalDNA)) %>%
   left_join(extraction %>% dplyr::select(Espece, Sample, `concentration (ng/µl`)) %>%
   rename(CDNA_sample = `concentration (ng/µl`,
          Cmolecules_ref = Mean,
@@ -424,6 +426,19 @@ df_Sper01[is.na(df_Sper01$species_name),"species_name"] <- as.character(df_Sper0
 
 ```
 
+#### Contamination check
+
+```{r contamination}
+df_Sper01 %>% filter(NegControl) %>%
+  group_by(Sample) %>%
+  summarise(sum(reads))
+
+df_Sper01 %>% filter(Sample == "PCRNeg_G1_R1") %>% arrange(-reads) #%>% View
+df_Sper01 %>% filter(Sample == "PCRNeg_L1_R1") %>% arrange(-reads) #%>% View
+df_Sper01 %>% filter(Sample == "PCRNeg_U1_R1") %>% arrange(-reads) #%>% View
+```
+
+
 Open data before filtering (grep, clean)
 
 ```{r data before filtering}
@@ -479,7 +494,7 @@ auxU <- df_Sper01 %>% filter(Community == "U" &
                           !NegControl) %>%
   filter(species_name %in%
            c("Fraxinus_excelsior", "Carpinus_betulus", "Capsella_bursa-pastoris")) %>%
-  dplyr::select(species_name, obiclean_weight) %>%
+  dplyr::select(species_name, obiclean_weight, Sample) %>%
   arrange(species_name) %>%
   pivot_wider(names_from = species_name, values_from = obiclean_weight)
 
@@ -494,7 +509,7 @@ auxT <- df_Sper01 %>% filter(Community == "T" &
                           !NegControl) %>%
   filter(species_name %in%
            c("Fraxinus_excelsior", "Carpinus_betulus", "Capsella_bursa-pastoris")) %>%
-  dplyr::select(species_name, obiclean_weight) %>%
+  dplyr::select(species_name, obiclean_weight, Sample) %>%
   arrange(species_name) %>%
   pivot_wider(names_from = species_name, values_from = obiclean_weight)
 matT <- as.matrix(auxT[,-1])
@@ -508,7 +523,7 @@ auxG <- df_Sper01 %>% filter(Community == "G" &
                           !NegControl) %>%
   filter(species_name %in%
            c("Fraxinus_excelsior", "Carpinus_betulus", "Capsella_bursa-pastoris")) %>%
-  dplyr::select(species_name, obiclean_weight) %>%
+  dplyr::select(species_name, obiclean_weight, Sample) %>%
   arrange(species_name) %>%
   pivot_wider(names_from = species_name, values_from = obiclean_weight)
 matG <- as.matrix(auxG[,-1])
