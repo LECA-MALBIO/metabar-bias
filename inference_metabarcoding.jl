@@ -411,7 +411,7 @@ reshape([41, 30, 67] ./ sum([41, 30, 67]), (1,3))
 mean(reads_dataT ./ sum(reads_dataT, dims = 2), dims = 1)
 
 inferT = vec(optT.minimizer ./ sum(optT.minimizer))
-vraiT = [41, 30, 67] ./ sum([41, 30, 67])
+vraiT = [20, 14, 33] ./ sum([20, 14, 33])
 finT = vec(mean(reads_dataT ./ sum(reads_dataT, dims = 2), dims = 1))
 
 #Absolute RMSE:
@@ -427,18 +427,18 @@ prop_exp(reads_dataT, Lambda)
 
 #_____
 optG = optim_Qmetabar(reads_dataG, Lambda,
-  m0tot = 1e5,
+  m0tot = 2.5e5,
   ncycles = 40,
   K = K,
   dispersion = 1.,
   nsim = nsim)
 
 optG.minimizer ./ sum(optG.minimizer)
-reshape([12, 24, 190] ./ sum([12, 24, 190]), (1,3))
+reshape([1, 4, 16] ./ 21, (1,3))
 mean(reads_dataG ./ sum(reads_dataG, dims = 2), dims = 1)
 
 inferG = vec(optG.minimizer ./ sum(optG.minimizer))
-vraiG = [12, 24, 190] ./ sum([12, 24, 190])
+vraiG = [1, 4, 16] ./ 21
 finG = vec(mean(reads_dataG ./ sum(reads_dataG, dims = 2), dims = 1))
 
 #Absolute RMSE:
@@ -683,7 +683,8 @@ sqrt(sum((finG .- vraiG) .^ 2)/3)
 sqrt(sum(((inferG .- vraiG) ./ vraiG) .^ 2)/3)
 sqrt(sum(((finG .- vraiG)./ vraiG) .^ 2)/3)
 
-
+x = finG ./ (1 .+ Lambda).^3
+x./ sum(x)
 
 ##____________________________________________________________________________________________________
 #Tests
