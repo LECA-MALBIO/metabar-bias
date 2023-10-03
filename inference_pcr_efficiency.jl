@@ -222,7 +222,7 @@ function optim_efficiencies(reads_data::Array{Float64, 2}, m0::Array{Float64, 1}
   end
 
 ##____________________________________________________________________________________________________
-# Inference
+# Efficiencies inference
 
 #Define K
 K = 7.57e12
@@ -274,7 +274,7 @@ optU_eff.minimizer[[8]] / 0.972 #CbeA
 optU_eff.minimizer[[8]] / 0.947 #CbeB
 
 
-## Inference for communities T and G with inferred Lambdas
+## Proportions inference for communities T and G with inferred Lambdas
 ##____________________________________________________________________________________________________
 
 Lambda_infer = vcat(1., vec(optU_eff.minimizer))

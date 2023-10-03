@@ -1,6 +1,6 @@
 
 ---
-title: 'How much PCR amplification is biasing DNA metabarcoding results ? - scripts'
+title: 'Towards quantitative DNA Metabarcoding: A method to overcome PCR amplification bias - scripts'
 author:
   - name: Sylvain Moinard
     institute: leca
@@ -23,8 +23,13 @@ author:
 institute:
   - leca: Univ. Grenoble-Alpes, Univ. Savoie Mont Blanc, CNRS, LECA, 38000, Grenoble, France.
   - ijf: Univ. Grenoble-Alpes, CNRS, Institut Joseph Fourier, 38000, Grenoble, France.
-output: html_document
+output:
+  html_document:
+    toc:true
+    theme: united
 ---
+
+##Setup
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -47,41 +52,44 @@ library(qpcR)
 
 ```
 
-Script for the manuscript ***
-Data is processed in the data_processing.Rmd file.
+This script is used to produce the analyses of the paper.
+Our data is processed in the data_processing.Rmd file.
 
-Last edit: 09/07/2023
+Last edit: 03/10/2023
 
 ## ddPCR analysis
 
-digital droplet PCR (ddPCR) data
+Open digital droplet PCR (ddPCR) data
 
-Cmolecules-ref : Copies of target molecules per ng of total DNA
+summary_experiment contains all info concerning the concentration assays
 
 ```{r open ddpcr data}
+#QuantaSoft output file with additional data
 dataddpcr <- read_csv("data/dataddpcr.csv")
+# Used columns:
+# Sample: Number of the plant sample
+# Concentration: Assayed copies/ul in well
+# sp: species
+# TotalDNA: Total DNA concentration in ddPCR wells, ng/ul
 
-extraction <- read_excel(
-  "data/dosage extraction plantes.xlsx")
-extraction <- extraction[-nrow(extraction),]
-extraction <- extraction[,-(4:9)]
+#Open extraction data
+#Used columns:
+# species name
+# Sample: Number of the plant sample
+# CDNA_sample: Concentration of total DNA in the sample assayed by Qubit, ng/ul
 
-Vmix_dd <- 20 #ul
-Vdna_dd <- 5 #ul
+extraction <- read.csv("data/extraction.csv")
 
-CtotDNA_ref <- 2.5e-3 *Vdna_dd/Vmix_dd
+Vdna_dd <- 5 #Volume of DNA in a well in ul
+Vmix_dd <- 20 #Volume of mix in a well in ul
 
-summary_dd <- dataddpcr %>% filter(Used & Sample < 100) %>%
-  group_by(Sample) %>%
+#summary_experiment contains all info concerning the concentration assays
+#Molecules_ng is the number of target molecules / ng of total DNA
+summary_experiment <- dataddpcr %>% group_by(Sample) %>%
   summarise(sp = sp[1],
-            Mean = mean(Concentration/TotalDNA),
-            min = min(Concentration/TotalDNA),
-            max = max(Concentration/TotalDNA)) %>%
-  left_join(extraction %>% dplyr::select(Espece, Sample, `concentration (ng/µl`)) %>%
-  rename(CDNA_sample = `concentration (ng/µl`,
-         Cmolecules_ref = Mean,
-         species_name = Espece) %>%
-  dplyr::select(Sample, species_name, sp, Cmolecules_ref, CDNA_sample)
+            Molecules_ng = mean(Concentration/TotalDNA)) %>%
+  left_join(extraction) %>%
+  dplyr::select(Sample, species_name, sp, Molecules_ng, CDNA_sample)
 ```
 
 ## Metabarcoding preparation 
@@ -91,23 +99,27 @@ DNA concentration in the different communities
 ### Uniform community (U)
 
 ```{r dna concentration}
-CDNA_T <- 0.5 #Total DNA concentration (ng/ul) for all plants in the T community (concentration in sample, not in pcr mix)
-C_species_ref <- CDNA_T/13 #concentration of Pt6, ng/ul
+CDNA_U <- 0.5
+#Total DNA concentration in ng/ul for all plants
+#in the U community (concentration in sample, not in pcr mix)
+C_species_ref <- CDNA_U/13 #concentration of each species, ng/ul
 
-summary_dd <- summary_dd %>%
-  mutate(Volume_equi = max(Cmolecules_ref)/Cmolecules_ref,
-         cDNA_U = C_species_ref*Volume_equi,
-         molecules_U = cDNA_U*Cmolecules_ref,
-         propU = molecules_U/sum(molecules_U))
-#molecules/ul in sample
+summary_experiment <- summary_experiment %>%
+  mutate(cDNA_U = C_species_ref*Volume_equi,
+         #Concentration of total DNA to use in the U commu
+         molecules_U = cDNA_U*Molecules_ng, #Molecules/ul in sample
+         propU = molecules_U/sum(molecules_U), #species proportion
+         Volume_equi = max(Molecules_ng)/Molecules_ng,
+         #Volume to take to be as concentrated as 1 ul of Ptr 6 (most concentrated)
+          RankG = 13 - rank(CDNA_sample/Volume_equi) + 1)
 ```
 
 Number of molecules in the U community
 
 ```{r commu U}
-VDNA_metab <- 2 #ul
-VDNA_metab * summary_dd$molecules_U
-VDNA_metab * sum(summary_dd$molecules_U)
+VDNA_metab <- 2 #Volume of DNA used in the mix, ul
+VDNA_metab * summary_experiment$molecules_U #Molecules of each species in mix
+VDNA_metab * sum(summary_experiment$molecules_U) #Total number of molecules
 ```
 
 ### "Uniform in Total DNA" Communauty (T)
@@ -115,12 +127,12 @@ VDNA_metab * sum(summary_dd$molecules_U)
 Number of molecules in the T community
 
 ```{r commu T}
-summary_dd <- summary_dd %>%
-  mutate(molecules_T = C_species_ref*Cmolecules_ref,
-         propT = molecules_T/sum(molecules_T))
+summary_experiment <- summary_experiment %>%
+  mutate(molecules_T = C_species_ref*Molecules_ng, #molecules/ul of sample
+         propT = molecules_T/sum(molecules_T)) #species proportions
 
-VDNA_metab * summary_dd$molecules_T
-VDNA_metab * sum(summary_dd$molecules_T)
+VDNA_metab * summary_experiment$molecules_T #Molecules of each species in mix
+VDNA_metab * sum(summary_experiment$molecules_T) #total number of molecules
 
 ```
 
@@ -128,952 +140,55 @@ VDNA_metab * sum(summary_dd$molecules_T)
 
 2-fold dilution
 
-Number of molecules in the T community
+Number of molecules in the G community
 
 ```{r commu G}
-summary_dd <- summary_dd %>%
-  mutate(RankG = 13 - rank(CDNA_sample/Volume_equi) + 1,
-         cDNA_G = CDNA_T/2^RankG*Volume_equi,
-         molecules_G = cDNA_G*Cmolecules_ref,
+summary_experiment <- summary_experiment %>%
+  mutate(cDNA_G = CDNA_T/2^RankG*Volume_equi,
+         molecules_G = cDNA_G*Molecules_ng,
          propG = molecules_G/sum(molecules_G))
 
-summary_dd$molecules_G * VDNA_metab
-sum(summary_dd$molecules_G) * VDNA_metab
+summary_experiment$molecules_G * VDNA_metab #Molecules of each species in mix
+sum(summary_experiment$molecules_G) * VDNA_metab #Total number of molecules
 ```
+## Analyses 
 
-### Figure
-
-Figure 3 of the manuscript
-
-```{r ddpcr analysis}
-data_dd_fig <- dataddpcr %>% filter(Used & Sample < 100) %>%
-  left_join(summary_dd %>% dplyr::select(sp, species_name, RankG))
-
-order_short <- summary_dd %>% dplyr::select(sp, RankG) %>%
-  arrange(-RankG) %>% pull(sp)
-
-highlight <- function(x, pat, color="black", family="") {
-  ifelse(grepl(pat, x), glue("<b style='font-family:{family}; color:{color}'>{x}</b>"), x)
-}
-
-ggplot(data_dd_fig)+
-  geom_point(aes(factor(sp, levels = order_short, ordered = T),
-                 Concentration_copies_ng/1000,
-                 shape = as.factor(TotalDNA)))+
-  geom_point(data = summary_dd,
-             aes(as.factor(sp), Cmolecules_ref/1000),
-             fill = "red", shape = 23, size = 3)+
-  # ggtitle("Target DNA molecules at given Total DNA concentration")+
-  labs(x = "Plant species",
-       y = "Thousands of molecules per ng of total DNA\n",
-       shape = TeX("Concentration (ng/$\\mu l$)"))+
-  scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))+
-  # theme_bw()+
-  theme(axis.text.x=element_markdown(),
-        legend.title.align=0.5,
-        legend.text.align = 0.5)
-
-ggsave(filename = "ddpcr_fig_clean.pdf",
-       dpi = 600, units = "mm",
-       width = 180, height = 130, device = "pdf")
-
-# ggsave(filename = "ddpcr_fig_clean.png",
-#        dpi = 600, units = "mm",
-#        width = 150, height = 90)
-```
-
-Stats ddpcr
-
-```{r stats ddpcr}
-
-summary_dd$Cmolecules_ref %>% summary
-
-```
-
-
-## Metabarcoding analysis
-
-Pipeline from raw data: see data_processing file
-
-Open data, filter bad PCR replicates.
-
-```{r open metabarcoding data}
-
-df_Sper01 <- read_csv("data/df_Sper01.csv")
-summary_sample <- df_Sper01 %>%
-  group_by(Sample) %>%
-  summarise(total_count_sample = sum(reads),
-            NegControl = NegControl[1],
-            Spike_level = Spike_level[1],
-            Community = Community[1]) %>%
-  arrange(total_count_sample)
-
-summary(summary_sample$total_count_sample)
-summary(summary_sample %>%
-          filter(!NegControl) %>% pull(total_count_sample))
-sd(summary_sample %>%
-          filter(!NegControl) %>% pull(total_count_sample))
-
-reads_threshold <- 5000
-
-ggplot(summary_sample %>%
-          filter(!NegControl))+
-  geom_point(aes(x = 1:nrow(summary_sample %>%
-          filter(!NegControl)),
-                 y = total_count_sample,
-                 shape = Community))+
-  labs(col = "Spike_level")+
-  scale_y_log10()+
-  geom_hline(yintercept = reads_threshold)
-
-```
-
-
-### Uniform Community (U)
+### Table 1 and Supplementary Table 1
 
 ```{r open barcodes}
-barcodes1 <- read_excel("data/new_plant_positive_control.xlsx")[,c(2,4:6)]
-names(barcodes1) <- c("species_name", "sequence", "length", "gc_content")
+barcodes <- read_excel("data/new_plant_positive_control.xlsx")[,c(2,4:6)]
+names(barcodes) <- c("species_name", "sequence", "length", "gc_content")
 
-barcodes1[barcodes1$species_name ==
+barcodes[barcodes$species_name ==
             "Salvia_pratensis",]$sequence <- "atcctgttttctcaaaacaaaggttcaaaaaacgaaaaaaaaaaag"
+
+barcodes <- barcodes %>% filter(species_name != "Rumex_acetosa")
+#Species not used in this experiment
 ```
 
-
-```{r analysis U}
-df_targetU <- df_Sper01 %>% filter(Community == "U" &
-                                   species_name %in% barcodes1$species_name &
-                        species_name != "Rumex_acetosa" &
-                          total_count_sample > reads_threshold &
-                          !NegControl) %>%
-  mutate(prop = obiclean_weight/total_count_sample) %>%
-  left_join(summary_dd %>% dplyr::select(species_name, sp, propU)) %>%
-  rename(prop_expected = propU)
+```{r table1}
+#Information about barcodes and extracted concentrations
+barcodes %>% left_join(extraction[,-2])
 ```
 
+### Figure 1 of the manuscript: PCR model
 
-
-
-### uniform in Total DNA Community (T)
-
-```{r analysis T}
-df_targetT <- df_Sper01 %>% filter(Community == "T" &
-                                   species_name %in% barcodes1$species_name &
-                        species_name != "Rumex_acetosa" &
-                          total_count_sample > reads_threshold &
-                          !NegControl) %>%
-  mutate(prop = obiclean_weight/total_count_sample) %>%
-  left_join(summary_dd %>% dplyr::select(species_name, sp, propT)) %>%
-  rename(prop_expected = propT)
-```
-
-### Geometric Community (G)
-
-```{r analysis G}
-df_targetG <- df_Sper01 %>% filter(Community == "G" &
-                                   species_name %in% barcodes1$species_name &
-                        species_name != "Rumex_acetosa" &
-                          total_count_sample > reads_threshold &
-                          !NegControl) %>%
-  mutate(prop = obiclean_weight/total_count_sample) %>%
-  left_join(summary_dd %>% dplyr::select(species_name, sp, propG)) %>%
-  rename(prop_expected = propG)
-```
-
-Figure 4 of the manuscript
-
-```{r observed proportions}
-colp <- c("Expected" = "gold",
-          "Expected\nwithout\nPCR bias" = "gold",
-          "Expected\nwithout\nPCR and\nconcentration\nbiases" = "gold",
-          "Inferred\nwith model" = "red",
-          "Inferred\nwith model" = "darkolivegreen2")
-
-gobsU1 <- ggplot(df_targetU)+
-  geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
-                   prop))+
-      geom_point(data = summary_dd,
-             aes(sp, 1/nrow(summary_dd),
-                 fill = "Expected\nwithout\nPCR bias"),
-             shape = 23,
-             size = 3)+
-    geom_hline(aes(yintercept = 1/nrow(summary_dd),
-                 col = "Expected\nwithout\nPCR and\nconcentration\nbiases"),
-             linetype = "dashed")+
-  ggtitle(TeX("Uniform community (${{M}_U}$)"))+
-  labs(y = "", x = "", fill = "", col = "")+
-  ylim(min(df_targetT$prop), max(df_targetT$prop)) +
-  theme(plot.title = element_text(hjust = 0.5),
-        axis.text.x=element_markdown(),
-        legend.title.align=0.5)+
-  scale_color_manual(values = colp)+
-  scale_fill_manual(values = colp)+
-  scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))
-  
-
-gobsT1 <- ggplot(df_targetT)+
-  geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
-                   prop))+
-    geom_point(data = summary_dd,
-             aes(sp, propT, fill = "Expected\nwithout\nPCR bias"),
-             shape = 23,
-             size = 3)+
-  geom_hline(aes(yintercept = 1/nrow(summary_dd), col = "Expected\nwithout\nPCR and\nconcentration\nbiases"),
-             linetype = "dashed")+
-  ggtitle(TeX("Uniform in Total DNA community (${{M}_T}$)"))+
-  labs(y = "", x = "", fill = "", col = "")+
-  theme(plot.title = element_text(hjust = 0.5),
-        axis.text.x=element_markdown(),
-        legend.title.align=0.5)+
-  scale_color_manual(values = colp)+
-  scale_fill_manual(values = colp)+
-    scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))
-
-
-# gobsG1 <- ggplot(df_targetG)+
-#   geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
-#                    prop))+
-#   labs(y = "", x = "")+
-#   ggtitle("Geometric community (G)")+
-#   theme(plot.title = element_text(hjust = 0.5))+
-#   geom_point(data = summary_dd,
-#              aes(sp, propG), shape = 23,
-#              fill = "gold", size = 3)+
-#   scale_y_log10()
-
-fig <- ggpubr::ggarrange(gobsU1, gobsT1, #gobsG1,
-                  ncol = 1,
-                  common.legend = T,
-                  legend = "right")
-annotate_figure(fig,
-                # top = text_grob("Final abundances in two mock communities with Sper01"),
-                bottom = text_grob("Species"),
-                left = text_grob("Observed reads proportions", rot = 90))
-
-# ggsave("metabar_results.pdf", units = "mm",
-#        width = 150, height = 200, dpi = 600, device = "pdf")
-```
-
-Examples of proportions
-
-```{r ptr prop}
-df_targetU %>% filter(sp == "Ptr") %>% pull(prop) %>% summary
-df_targetU %>% filter(sp == "Ptr") %>% pull(prop) %>% sd
-
-df_targetU %>% group_by(sp) %>% summarise(s = sd(prop), m = mean(prop)) %>%arrange(m)
-
-df_targetG %>% group_by(sp) %>% summarise(s = sd(prop), m = mean(prop)) %>%arrange(m)
-```
-
-
-Export to Julia to infer efficiencies
-
-```{r export julia U}
-readsU <- df_targetU %>%
-  dplyr::select(Sample, obiclean_weight, species_name) %>%
-  pivot_wider(names_from = species_name, values_from = obiclean_weight) %>% ungroup %>% dplyr::select(-Sample)
-
-# write_csv(readsU, "data/reads_U.csv")
-
-readsT <- df_targetT %>%
-  dplyr::select(Sample, obiclean_weight, species_name) %>%
-  pivot_wider(names_from = species_name, values_from = obiclean_weight) %>% ungroup %>% dplyr::select(-Sample)
-
-# write_csv(readsT, "data/reads_T.csv")
-
-readsG <- df_targetG %>%
-  dplyr::select(Sample, obiclean_weight, species_name) %>%
-  pivot_wider(names_from = species_name,
-              values_from = obiclean_weight,
-              values_fill = 0) %>% ungroup %>% dplyr::select(-Sample)
-
-# write_csv(readsG, "data/reads_G.csv")
-```
-
-### Correction from a mock community (U)
-
-Correction factor is:
-
-a_s = prop_obs(s)/prop_init(s) (* constant value)
-
-then prop_infer(s) = prop_obs(s)/a_s(commuU)
-
-
-```{r correction mock}
-order_sp <- summary_dd %>% dplyr::select(species_name, RankG) %>%
-  arrange(-RankG) %>% pull(species_name)
-
-correcU <- df_targetU %>%
-  group_by(species_name) %>%
-  summarise(correc = median(prop)/prop_expected[1])
-
-#U
-df_targetU <- df_targetU %>% left_join(correcU)
-df_targetU$prop_infer_mock <- df_targetU$prop/df_targetU$correc
-df_targetU <- df_targetU %>%
-  group_by(Sample) %>%
-  mutate(prop_infer_mock = prop_infer_mock/sum(prop_infer_mock,
-                                               na.rm = T))
-
-df_targetU$species_name <- factor(df_targetU$species_name,
-                                  levels = order_sp,
-                                  ordered = T)
-
-#T
-df_targetT <- df_targetT %>% left_join(correcU)
-df_targetT$prop_infer_mock <- df_targetT$prop/df_targetT$correc
-df_targetT <- df_targetT %>%
-  group_by(Sample) %>%
-  mutate(prop_infer_mock = prop_infer_mock/sum(prop_infer_mock,
-                                               na.rm = T))
-df_targetT$species_name <- factor(df_targetT$species_name,
-                                  levels = order_sp,
-                                  ordered = T)
-
-#G
-df_targetG <- df_targetG %>% left_join(correcU)
-df_targetG$prop_infer_mock <- df_targetG$prop/df_targetG$correc
-df_targetG <- df_targetG %>%
-  group_by(Sample) %>%
-  mutate(prop_infer_mock = prop_infer_mock/sum(prop_infer_mock,
-                                               na.rm = T))
-
-df_targetG$species_name <- factor(df_targetG$species_name,
-                                  levels = order_sp,
-                                  ordered = T)
-```
-
-
-```{r T adn G corrected by U}
-
-# ginferT1 <- ggplot(df_targetT)+
-#   geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
-#                    prop_infer_mock))+
-#   geom_point(data = df_targetT %>% group_by(sp) %>%
-#                summarise(prop = median(prop)),
-#     aes(sp, prop, fill = "Observed\n(Median)"),
-#              shape = 21, size = 3)+
-#   theme(axis.text.x=element_blank())+
-#   labs(y = "", x = "",
-#        fill = "", col = "")+
-#   geom_point(data = summary_dd,
-#              aes(sp, propT, fill = "Expected"), shape = 23,
-#              size = 3)+
-#   scale_fill_manual(values = colp)+
-#   ggtitle("Uniform in Total DNA community (T)")+
-#   theme(plot.title = element_text(hjust = 0.5))
-# 
-# ginferG1 <- ggplot(df_targetG)+
-#   geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
-#                    prop_infer_mock))+
-#   geom_point(data = df_targetG %>% group_by(sp) %>%
-#                summarise(prop = median(prop)),
-#              aes(sp, prop, fill = "Observed\n(Median)"),
-#              shape = 21, size = 3)+
-#   labs(y = "", x = "",
-#        fill = "", col = "")+
-#   geom_point(data = summary_dd,
-#              aes(sp, propG, fill = "Expected"), shape = 23,
-#              size = 3)+
-#   scale_fill_manual(values = colp)+
-#   ggtitle("Geometric community (G)")+
-#   theme(plot.title = element_text(hjust = 0.5),
-#         legend.position = "none")+
-#   scale_y_log10()+
-#   scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))+
-#   theme(axis.text.x=element_markdown())
-# 
-# fig <- egg::ggarrange(ginferT1, ginferG1,
-#                       ncol = 1)
-# annotate_figure(fig,
-#                 top = text_grob("Corrected abundances in two mock communities with Sper01"),
-#                 bottom = text_grob("Species"),
-#                 left = text_grob("Inferred reads proportions", rot = 90))
-
-# ggsave("metabar_results_corrected.pdf", units = "mm",
-#        width = 180, height = 150, dpi = 600, device = "pdf")
-
-```
-
-Inference results
-
-```{r inference results}
-resU1 <- df_targetU %>% group_by(species_name) %>%
-  summarise(prop = median(prop), prop_expected = prop_expected[1],
-            prop_infer_mock = median(prop_infer_mock))
-
-resT1 <- df_targetT %>% group_by(species_name) %>%
-  summarise(prop = median(prop), prop_expected = prop_expected[1],
-            prop_infer_mock = median(prop_infer_mock))
-
-resG1 <- df_targetG %>% group_by(species_name) %>%
-  summarise(sp = sp[1], prop = median(prop), prop_expected = prop_expected[1],
-            prop_infer_mock = median(prop_infer_mock))
-```
-
-Proportions inferred in julia using the efficiencies (inference_metabarcoding.jl) :
-
-In Julia : reads U -> efficiencies
-efficiencies -> prop T and G
-
-```{r results julia T}
-inferT <- read.csv("data/prop_inferT.csv")
-colnames(inferT) <- colnames(readsT)
-resT1 <- resT1 %>%
-  left_join(inferT %>% pivot_longer(everything(),
-                                    names_to = "species_name",
-                                    values_to = "prop_infer_Lambda")) %>%
-  arrange(-dplyr::row_number())
-
-```
-
-```{r results julia G}
-inferG <- read.csv("data/prop_inferG.csv")
-colnames(inferG) <- colnames(readsG)
-resG1 <- resG1 %>%
-  left_join(inferG %>% pivot_longer(everything(),
-                                    names_to = "species_name",
-                                    values_to = "prop_infer_Lambda")) %>%
-  arrange(-dplyr::row_number())
-```
-
-
-```{r Table 3}
-# View(resT1)
-# View(resG1)
-```
-
-
-RMSE to compare observed/corrected(2 methods) vs expected proportions
-
-```{r rmse}
-#U
-summary(resU1$prop)
-
-sqrt(sum((resU1$prop-resU1$prop_expected)^2)/nrow(resU1))
-sqrt(sum((resU1$prop_infer_mock-resU1$prop_expected)^2)/nrow(resU1))
-# sqrt(sum((resU1$prop_infer_Lambda-resU1$prop_expected)^2)/nrow(resU1))
-
-sqrt(sum(((resU1$prop-resU1$prop_expected)/resU1$prop_expected)^2)/nrow(resU1))
-sqrt(sum(((resU1$prop_infer_mock-resU1$prop_expected)/resU1$prop_expected)^2)/nrow(resU1))
-# sqrt(sum(((resU1$prop_infer_Lambda-resU1$prop_expected)/resU1$prop_expected)^2)/nrow(resU1))
-
-#T
-summary(resT1$prop)
-
-sqrt(sum((resT1$prop-resT1$prop_expected)^2)/nrow(resT1))
-sqrt(sum((resT1$prop_infer_mock-resT1$prop_expected)^2)/nrow(resT1))
-sqrt(sum((resT1$prop_infer_Lambda-resT1$prop_expected)^2)/nrow(resT1))
-
-sqrt(sum(((resT1$prop-resT1$prop_expected)/resT1$prop_expected)^2)/nrow(resT1))
-sqrt(sum(((resT1$prop_infer_mock-resT1$prop_expected)/resT1$prop_expected)^2)/nrow(resT1))
-sqrt(sum(((resT1$prop_infer_Lambda-resT1$prop_expected)/resT1$prop_expected)^2)/nrow(resT1))
-
-#RMSE of T if it is considered as a uniform community
-sqrt(sum((resT1$prop-resU1$prop_expected)^2)/nrow(resT1))
-sqrt(sum(((resT1$prop-resU1$prop_expected)/resT1$prop_expected)^2)/nrow(resT1))
-
-#G
-summary(resG1$prop)
-
-sqrt(sum((resG1$prop-resG1$prop_expected)^2)/nrow(resG1))
-sqrt(sum((resG1$prop_infer_mock-resG1$prop_expected)^2)/nrow(resG1))
-sqrt(sum((resG1$prop_infer_Lambda-resG1$prop_expected)^2)/nrow(resG1))
-
-sqrt(sum(((resG1$prop-resG1$prop_expected)/resG1$prop_expected)^2)/nrow(resG1))
-sqrt(sum(((resG1$prop_infer_mock-resG1$prop_expected)/resG1$prop_expected)^2)/nrow(resG1))
-sqrt(sum(((resG1$prop_infer_Lambda-resG1$prop_expected)/resG1$prop_expected)^2)/nrow(resG1))
-```
-
-Hill numbers
-
-```{r}
-#Hill
-D <- function(ps, q){
-  ps <- ps/sum(ps)
-  ps <- ps[ps>0]
-  ifelse(q == 1, exp(-sum(ps*log(ps))), sum(ps^q)^(1/(1-q)))
-}
-
-D(resT1$prop_expected, 1)
-D(resT1$prop, 1)
-D(resT1$prop_infer_mock, 1)
-D(resT1$prop_infer_Lambda, 1)
-
-D(resT1$prop_expected, 2)
-D(resT1$prop, 2)
-D(resT1$prop_infer_mock, 2)
-D(resT1$prop_infer_Lambda, 2)
-
-D(resG1$prop_expected, 1)
-D(resG1$prop, 1)
-D(resG1$prop_infer_mock, 1)
-D(resG1$prop_infer_Lambda, 1)
-
-D(resG1$prop_expected, 2)
-D(resG1$prop, 2)
-D(resG1$prop_infer_mock, 2)
-D(resG1$prop_infer_Lambda, 2)
-
-```
-
-
-
-```{r G corrected by U}
-ginferG1 <- ggplot(df_targetG)+
-  geom_boxplot(aes(factor(sp, levels = order_short,
-                          ordered = T),
-                   prop))+
-    geom_point(data = summary_dd,
-             aes(sp, propG, fill = "Expected"), shape = 23,
-             size = 2)+
-    geom_point(data = resG1, aes(sp, prop_infer_Lambda, fill = "Inferred\nwith model"),
-             shape = 23, size = 2)+
-  labs(y = "Proportions", x = "Species",
-       fill = "", col = "")+
-  scale_fill_manual(values = colp)+
-  ggtitle("Abundances in the Geometric community (G)")+
-  theme(plot.title = element_text(hjust = 0.5))+
-  scale_y_log10()+
-  scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))+
-  theme(axis.text.x=element_markdown())
-
-ginferG1
-
-# ggsave("metabar_results_corrected_G.png", units = "mm",
-#        width = 150, height = 90, dpi = 600)
-
-```
-
-## Taqman
-
-```{r open taqman}
-endpoint <- read.csv2("data/SPER01_End_Point_res.csv")
-endpoint <- endpoint[,c("Well", "End.RFU")]
-
-ampli <- read.csv2("data/SPER01_ampli_res.csv")[,-1]
-
-cq <- read.csv2("data/SPER01_Cq_res.csv")
-cq <- cq[cq$Fluor == "FAM",c("Well", "Fluor", "Cq")]
-
-taqman <- read_csv("data/taqman.csv")
-taqman[taqman$sp == "Fe","sp"] <- "Fex"
-
-cinetique <- ampli %>%
-  pivot_longer(!Cycle, names_to = "Well",
-               values_to = "RFU")
-
-cinetique$Dilu <- match(substr(cinetique$Well, 1, 1), LETTERS)
-cinetique$Repli <- as.integer(substr(cinetique$Well, 2, nchar(cinetique$Well)))
-
-cinetique$probe <- "Fex"
-cinetique[cinetique$Repli <= 9, "probe"] <- "Cbp" 
-cinetique[cinetique$Repli <= 6, "probe"] <- "CbeB"
-cinetique[cinetique$Repli <= 3, "probe"] <- "CbeA"
-
-cinetique$sp <- "Fex"
-cinetique[cinetique$Repli <= 9, "sp"] <- "Cbp" 
-cinetique[cinetique$Repli <= 6, "sp"] <- "Cbe"
-cinetique[cinetique$Repli <= 3, "sp"] <- "Cbe"
-
-cinetique <- cinetique %>% filter(Dilu <= 6) %>%
-  mutate(Neg = (Dilu == 6))
-
-res_taqman <- cq %>% left_join(endpoint)
-
-res_taqman$Dilu <- match(substr(res_taqman$Well, 1, 1), LETTERS)
-res_taqman$Repli <- as.integer(substr(res_taqman$Well, 2, nchar(res_taqman$Well)))
-
-res_taqman$probe <- "Fex"
-res_taqman[res_taqman$Repli <= 9, "probe"] <- "Cbp" 
-res_taqman[res_taqman$Repli <= 6, "probe"] <- "CbeB"
-res_taqman[res_taqman$Repli <= 3, "probe"] <- "CbeA"
-
-res_taqman$sp <- "Fex"
-res_taqman[res_taqman$Repli <= 9, "sp"] <- "Cbp" 
-res_taqman[res_taqman$Repli <= 6, "sp"] <- "Cbe"
-res_taqman[res_taqman$Repli <= 3, "sp"] <- "Cbe"
-
-res_taqman <- res_taqman %>%
-  filter(Dilu <= 6) %>% mutate(Neg = (Dilu == 6))
-
-res_taqman <- res_taqman %>%
-  left_join(taqman,
-            by = c("sp" = "sp", "Dilu" = "mix"))
-```
-
-
-```{r show taqman results}
-ggplot(cinetique %>% filter(!Neg))+
-  geom_line(aes(Cycle, RFU, group = Well, col = probe))
-
-ggplot(res_taqman %>% filter(!Neg))+
-  geom_point(aes(copies_ul, Cq, group = Well, col = probe))+
-  scale_x_log10()+
-  labs(y="Ct")+
-  ggtitle("Ct = f(log(Concentration))")
-```
-
-Linear regression
-
-```{r linear regression taqman}
-Vmix_taq <- 25 #ul
-
-res_taqman$slope <- NA
-res_taqman$intercept <- NA
-
-for (s in unique(res_taqman$probe)){
-  reg <- lm(Cq ~ log10(copies),
-            res_taqman %>%
-              filter(probe == s & !Neg) %>%
-              group_by(Dilu) %>%
-              summarise(Cq = mean(Cq),
-                        copies = Vmix_taq*copies_ul[1]))
-  res_taqman[res_taqman$probe == s, "slope"] <- reg$coefficients[2]
-  res_taqman[
-    res_taqman$probe == s, "intercept"] <- reg$coefficients[1]
-}
-
-res_taqman$rate <- 10^(-1/res_taqman$slope)-1
-
-res_taqman$Mct <- 10^(log10(1+res_taqman$rate)*
-                         res_taqman$intercept)
-
-res_taqman %>% group_by(probe) %>%
-  summarise(rate = rate[1],
-            Mct = Mct[1]/1e10)
-
-```
-
-
-```{r 2 replicates}
-flam <- function(p){
-  10^(-1/p)-1
-}
-
-res_lm_test <- NULL
-
-for (s in unique(res_taqman$probe)){
-  for (try in 1:100){
-    reg <- lm(Cq ~ log10(copies),
-              res_taqman %>%
-                filter(probe == s & !Neg) %>%
-                group_by(Dilu) %>%
-                summarise(Cq = mean(Cq[sample(1:n(), 2)]),
-                          copies = Vmix_taq*copies_ul[1]))
-    res_lm_test <- rbind(res_lm_test,
-                         data.frame(probe = s,
-                                    slope = reg$coefficients[2]))
-  }
-}
-
-res_lm_test %>% group_by(probe) %>% summarise(min = min(slope),
-                                              max = max(slope)) %>%
-  mutate(lmin = flam(min), lmax = flam(max), gap = lmax - lmin)
-
-```
-
-###RFU Threshold for each well
-
-```{r rfu}
-res_taqman$RFU_Cq <- NA
-
-for (i in 1:nrow(res_taqman)){
-  aux <- cinetique %>% filter(Dilu == res_taqman[i,]$Dilu &
-                      Repli == res_taqman[i,]$Repli &
-                      probe == res_taqman[i,]$probe &
-                      abs(Cycle - res_taqman[i,]$Cq)<1)
-
-res_taqman[i,"RFU_Cq"] <- (aux[2,]$RFU - aux[1,]$RFU)*
-  (res_taqman[i,]$Cq-aux[1,]$Cycle)+aux[1,]$RFU
-}
-
-res_taqman <- res_taqman %>%
-  mutate(K = Mct/(RFU_Cq/End.RFU))
-
-Mct_glob <- res_taqman %>% filter(!Neg) %>%
-  group_by(sp) %>%
-  summarise(Mct = mean(Mct)) %>% pull(Mct) %>% mean
-
-K <- res_taqman %>% filter(!Neg) %>%
-  group_by(sp) %>%
-  summarise(K = mean(K)) %>% pull(K) %>% sum
-
-```
-
-
-### Computing PCR efficiencies
-
-
-```{r pcr efficiencies}
-aux <- res_taqman %>% filter(!Neg) %>%
-  mutate(Lambda = (Mct_glob/(Vmix_taq*copies_ul))^(1/Cq)-1)
-
-ggplot(aux)+
-  geom_point(aes(probe, Lambda, col = factor(Dilu)))
-
-aux %>% group_by(probe) %>% summarise(Lambda = mean(Lambda))
-aux %>% group_by(sp) %>% summarise(Lambda = mean(Lambda))
-
-lam <- aux %>% group_by(sp) %>%
-  summarise(efficiency = mean(Lambda))
-
-res_taqman <- res_taqman %>% left_join(lam)
-
-
-aux %>% group_by(probe) %>%
-    summarise(efficiency = mean(Lambda)) %>% mutate(efficiency = efficiency/0.940*0.924)
-```
-
-
-### Normalise End.RFU for Cbe
-
-```{r normalise rfu cbe}
-x <- res_taqman %>% filter(sp == "Cbe" & Dilu < 6) %>%
-  group_by(probe, Dilu) %>%
-  summarise(end.rfu = mean(End.RFU), Cq = mean(Cq))
-
-correcCbe <- x %>% group_by(Dilu, probe) %>%
-  summarise(end.rfu = mean(end.rfu)) %>%
-  pivot_wider(names_from = probe, values_from = end.rfu) %>%
-  mutate(correc = CbeA/CbeB)
-
-
-y <- cinetique %>% filter(sp == "Cbe" & !Neg) %>% left_join(correcCbe) %>%
-  mutate(RFUbis = ifelse(probe == "CbeB", RFU*correc, RFU))
-
-ggplot(y)+
-  geom_line(aes(Cycle, RFU, col = probe, group = Well,
-                linetype = factor(Dilu)))
-
-ggplot(y)+
-  geom_line(aes(Cycle, RFUbis, col = probe, group = Well,
-                linetype = factor(Dilu)))
-
-z <- res_taqman %>% filter(sp == "Cbe" & !Neg)
-
-z$RFU_Cq <- NA
-for (i in 1:nrow(z)){
-  a <- cinetique %>% filter(Dilu == z[i,]$Dilu &
-                      Repli == z[i,]$Repli &
-                      probe == z[i,]$probe &
-                      abs(Cycle - z[i,]$Cq)<1)
-
-z[i,"RFU_Cq"] <- (a[2,]$RFU - a[1,]$RFU)*
-  (z[i,]$Cq-a[1,]$Cycle)+a[1,]$RFU
-}
-
-seuil_Cq <- mean(z$RFU_Cq)
-
-fCq <- function(ampli){
-  c2 <- which(ampli >= seuil_Cq)[1]
-  c1 <- c2-1
-  Cq <- (seuil_Cq - ampli[c1]+(ampli[c2] - ampli[c1])*c1)/
-    (ampli[c2] - ampli[c1])
-  Cq
-}
-
-res <- NULL
-for (p in unique(y$Well)){
-  res <- rbind(res,
-               data.frame(Well = p,
-                          probe = y[y$Well == p,]$probe[1],
-                          Cq = fCq(y[y$Well == p,]$RFU),
-                          Cqbis = fCq(y[y$Well == p,]$RFUbis)))
-}
-
-ggplot(res_taqman %>% filter(!Neg & sp == "Cbe"))+
-  geom_point(aes(Dilu, Cq, col = probe))
-```
-
-
-### Amplification bias
-
-```{r prop commu 3 species}
-
-qmet <- df_targetU %>%
-  filter(species_name %in% c("Capsella_bursa-pastoris",
-                             "Carpinus_betulus",
-                             "Fraxinus_excelsior"))
-
-ggplot(qmet)+
-  geom_boxplot(aes(species_name,
-                   prop))+
-  theme(axis.text.x = element_text(angle = 90))
-                   
-qmet %>% group_by(species_name) %>%
-  summarise(prop = mean(prop)) %>% mutate(prop = prop/sum(prop))
-
-```
-
-```{r}
-dfG <- df_targetG %>% filter(species_name %in% c("Capsella_bursa-pastoris",
-                             "Carpinus_betulus",
-                             "Fraxinus_excelsior")) %>% left_join(df_targetG %>% filter(species_name %in% c("Capsella_bursa-pastoris",
-                             "Carpinus_betulus",
-                             "Fraxinus_excelsior")) %>% group_by(Sample) %>% summarise(prop_all = sum(prop))) %>%
-  mutate(prop = prop/prop_all)
-
-dfG %>% group_by(sp) %>% summarise(mean(prop))
-
-summary_dd %>% filter(sp %in% c("Cbe", "Cbp", "Fex")) %>% mutate(a = propG/sum(propG)) %>% pull(a)
-
-ggplot(dfG)+
-    geom_boxplot(aes(factor(sp, levels = order_short,
-                          ordered = T),
-                   prop))+
-    geom_point(data = summary_dd %>% filter(sp %in% c("Cbe", "Cbp", "Fex")),
-             aes(sp, propG/sum(propG), fill = "Expected"), shape = 23,
-             size = 2)+
-    geom_point(data = data.frame(),
-             aes(c("Cbe", "Cbp", "Fex"),
-                 c(0.02896, 0.1221, 0.8489),
-                 fill = "Inferred\nwith model"),
-             shape = 23, size = 2)+
-  labs(y = "Proportions", x = "Species",
-       fill = "", col = "")+
-  scale_fill_manual(values = colp)+
-  ggtitle("Abundances in the Geometric community (G)")+
-  theme(plot.title = element_text(hjust = 0.5))+
-  theme(axis.text.x=element_markdown())
-
-```
-
-
-## PCR Simulator
+#### PCR Simulator
 
 Fitting PCR models to qPCR data (SybrGreen) of Capsella bursa-pastoris.
 
-
-```{r pcr models}
-
-ncycles <- 60
-low_cycle <- 20
-high_cycle <- 50
-
-amplif <- function(m, efficiency, charge,
-                   satu = "linear",
-                   c = 1, e = 1,
-                   approxN = F){
-  #Function used for 1 cycle of amplification
-  #ApproxN = Normal approximation
-  if (!approxN){
-    m <- floor(m)
-  }
-  if(satu != "linear"){
-    #mechanistic saturation
-    gamma <- function(x){
-      2/(1+sqrt(1-4*c^2*x*(1-x)))
-    }
-    lambda <- efficiency*c*gamma(charge)*(1-charge)*(e-charge)
-  }
-  else{
-    lambda <- max(0, efficiency*(1-charge))
-  }
-  if (approxN){
-    nb <- rnorm(1, mean = m*lambda,
-                sd = sqrt(m*lambda*(1-lambda))) #nb of new molecules
-  }
-  else {
-    nb <- rbinom(1, m, lambda) #nb of new molecules
-  }
-  return(nb)
-}
-
-simu_pcr <- function(cycles = ncycles,
-                       m0=1,
-                       lambda=1,
-                       K=Inf,
-                       satu = "linear",
-                       c = 1,
-                       e = 1,
-                       delta = 1,
-                       approxN = F) {
-  param <- data.frame(m0 = m0,
-                      lambda = lambda)
-  
-  nspecies <- nrow(param)
-  
-  #Number of molecules of each species at each cycle
-  kinetics <- matrix(0, nrow = cycles+1, ncol = nspecies)
-  if (delta <= 1){
-    kinetics[1,] <- rpois(length(m0), m0)
-  } else {
-    kinetics[1,] <- rnbinom(length(m0), m0/delta, 1/delta)
-  }
-  init <- kinetics[1,]
-  
-  for (cyc in 2:(1+cycles)) {
-    n <- sum(kinetics[cyc-1,])
-    for (m in 1:nspecies) {
-      mc <- kinetics[cyc-1,m]
-      ampli <- amplif(mc, param$lambda[m], 
-                      ((n-init[m])/K),
-                      satu = satu, c = c, e = e,
-                      approxN = approxN)
-      kinetics[cyc,m] <- kinetics[cyc-1,m]+ampli
-    }
-  }
-  return(kinetics)
-}
-
-simu_metabar <- function(cycles = ncycles,
-                       m0=1,
-                       lambda=1,
-                       K=Inf,
-                       satu = "linear",
-                       c = 1,
-                       e = 1,
-                       delta = 1,
-                       approxN = F,
-                       d = 5e-9){
-  kinetics_pcr <- simu_pcr(cycles = cycles,
-                       m0=m0,
-                       lambda=lambda,
-                       K=K,
-                       satu = satu,
-                       c = c,
-                       e = e,
-                       delta = delta,
-                       approxN = approxN)
-  amplicons <- kinetics_pcr[nrow(kinetics_pcr),]
-  #Sequencing
-  if (approxN){
-    reads <- rnorm(length(amplicons), mean = amplicons*d,
-                   sd = sqrt(d*amplicons*(1-amplicons/K)))
-  } else {
-    reads <- rbinom(length(amplicons), floor(K*d), amplicons/K)
-  }
-  reads
-}
-
-#Best fit exponential model
-fcrit_exp <- function(par,
-                      data = NULL, K = 1e11,
-                      low_cycle = 20, high_cycle = 40){
-  m0 <- 10^par[1]
-  lam <- par[2]
-  set.seed(123456)
-  p <- m0*(1+lam)^seq(0:ncycles)
-  crit <- sum(((p[low_cycle:high_cycle+1]-
-                  data$molecules[low_cycle:high_cycle])/
-                    data$molecules[low_cycle:high_cycle])^2)
-  crit <- crit
-  return(crit)
-}
-```
-
-
 ```{r qpcr open data}
-
+#Open file containing qPCR data
 ampli <- read.csv("data/20210712_101200_CT030043_SPER01_ANALYSE -  Quantification Amplification Results_SYBR.csv")[,-1]
 
 ampli <- ampli %>% pivot_longer(2:ncol(ampli))
 colnames(ampli)[2:3]<- c("Well","RFU")
 
+K <- 7.568463e+12 #Charge capacity, computed below
+
+#Convert RFU to molecules
 a <- K/(max(ampli$RFU)-min(ampli$RFU))
 b <- -a*min(ampli$RFU)
-
 ampli$molecules <- a * ampli$RFU + b
 
 ampli <- ampli[ampli$Well == "B7",] #B7: species Cbp, sample 26
@@ -1082,23 +197,35 @@ ampli <- ampli[ampli$Well == "B7",] #B7: species Cbp, sample 26
 
 Parameters are fitted numerically. No biological consideration.
 
-Figure 1 of the manuscript
-
 ```{r saturation models}
 KWell <- max(ampli$molecules)
+ncycles <- nrow(ampli)
+
+#Best fit exponential model
+fcrit_exp <- function(par,
+                      data = NULL,
+                      low_cycle = 20, high_cycle = 40){
+  m0 <- 10^par[1]
+  lam <- par[2]
+  p <- m0*(1+lam)^seq(0:ncycles)
+  crit <- sum(((p[low_cycle:high_cycle+1]-
+                  data$molecules[low_cycle:high_cycle])/
+                    data$molecules[low_cycle:high_cycle])^2)
+  crit <- crit
+  return(crit)
+}
 
 opt_exp <- optim(c(5.75, 0.55),
                    fcrit_exp,
                    data = ampli,
-                   K = KWell,
                    low_cycle= low_cycle,
-                 high_cycle = 24,
+                   high_cycle = 24,
                    lower = c(1, 0.4),
                    upper = c(10, 0.9),
                    method = "L-BFGS-B")
 
 #Exponential model
-modele_exp <- 10^opt_exp$par[1]*(1+opt_exp$par[2])^seq(0:ncycles)
+model_exp <- 10^opt_exp$par[1]*(1+opt_exp$par[2])^seq(0:ncycles)
 
 # mmec <- cm3
 # mmec$expr <- "Fluo ~ mmec$fct(Cycles, c(M0, Lam, K, c, e))"
@@ -1181,6 +308,9 @@ mlog$parnames <- c("M0", "Lam", "K")
 mlog$name <- "mlog"
 mlog$type <- "my log"
 
+#Weight cycles according to amplification step
+#For graphical purpose here
+
 weights_log <- c(rep(1, 12), rep(100, 4), 1000, rep(200, 3),
                  rep(50, 5),
                  rep(1, 25), rep(500, 1), rep(0, 10))
@@ -1197,6 +327,7 @@ res_log <- a*fitlog$m$predict(newdata = fitlog$DATA)+b
 # res_mec <- a*fitmec$m$predict(newdata = fitmec$DATA)+b
 ```
 
+Figure:
 
 ```{r saturation models - figure}
 ggplot()+
@@ -1222,58 +353,888 @@ ggplot()+
         #                "Capsella bursa-pastoris"))+
         #   theme(plot.title = element_text(hjust = 0.5))
 
-ggsave(filename = "saturation_models2.pdf",
-       dpi = 600, units = "mm",
-       width = 180, height = 120, device = "pdf")
+# ggsave(filename = "Figures/saturation_models2.pdf",
+#        dpi = 600, units = "mm",
+#        width = 150, height = 100, device = "pdf")
 ```
 
 
 
 
-## Simulations showing the impact of efficiency variations
 
-Simulated amplification to quantify the effect of a efficiency difference
+### Figure 3 of the manuscript: ddPCR results
 
-Figure 5 of the manuscript.
+```{r ddpcr analysis}
+
+
+data_dd_fig <- dataddpcr %>%
+  left_join(summary_experiment %>% dplyr::select(sp, species_name, RankG))
+
+order_short <- summary_experiment %>% dplyr::select(sp, RankG) %>%
+  arrange(-RankG) %>% pull(sp)
+
+highlight <- function(x, pat, color="black", family="") {
+  ifelse(grepl(pat, x), glue("<b style='font-family:{family}; color:{color}'>{x}</b>"), x)
+}
+
+ggplot(data_dd_fig)+
+  geom_point(aes(factor(sp, levels = order_short, ordered = T),
+                 Concentration_copies_ng/1000,
+                 shape = as.factor(TotalDNA)))+
+  geom_point(data = summary_experiment,
+             aes(as.factor(sp), Molecules_ng/1000),
+             fill = "red", shape = 23, size = 3)+
+  # ggtitle("Target DNA molecules at given Total DNA concentration")+
+  labs(x = "Plant species",
+       y = "Thousands of molecules per ng of total DNA\n",
+       shape = TeX("Concentration (ng/$\\mu l$)"))+
+  scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))+
+  # theme_bw()+
+  theme(axis.text.x=element_markdown(),
+        legend.title.align=0.5,
+        legend.text.align = 0.5)
+
+# ggsave(filename = "Figures/ddpcr_fig_clean.pdf",
+#        dpi = 600, units = "mm",
+#        width = 150, height = 100, device = "pdf")
+
+# ggsave(filename = "Figures/ddpcr_fig_clean.png",
+#        dpi = 600, units = "mm",
+#        width = 150, height = 90)
+```
+
+Stats ddPCR:
+
+Species Populus tremula and Rhododendron ferrugineum
+
+```{r stats ddpcr}
+data_dd_fig %>% filter(sp == "Ptr") %>%
+  pull(Concentration_copies_ng) %>% summary
+
+data_dd_fig %>% filter(sp == "Ptr") %>%
+  pull(Concentration_copies_ng) %>% sd
+
+data_dd_fig %>% filter(sp == "Rfe") %>%
+  pull(Concentration_copies_ng) %>% summary
+
+data_dd_fig %>% filter(sp == "Rfe") %>%
+  pull(Concentration_copies_ng) %>% sd
+
+summary_experiment$Molecules_ng %>% summary
+```
+
+
+## Metabarcoding analysis
+
+Pipeline from raw fastq data: see data_processing.Rmd file
+
+Open data, filter bad PCR replicates.
+
+```{r open metabarcoding data}
+df_Sper01 <- read_csv("data/df_Sper01.csv")
+
+summary_sample <- df_Sper01 %>%
+  group_by(Sample) %>%
+  summarise(total_count_sample = sum(reads),
+            NegControl = NegControl[1],
+            Spike_level = Spike_level[1],
+            Community = Community[1]) %>%
+  arrange(total_count_sample)
+
+summary(summary_sample$total_count_sample)
+summary(summary_sample %>%
+          filter(!NegControl) %>% pull(total_count_sample))
+sd(summary_sample %>%
+          filter(!NegControl) %>% pull(total_count_sample))
+
+reads_threshold <- 5000
+
+ggplot(summary_sample %>%
+          filter(!NegControl))+
+  geom_point(aes(x = 1:nrow(summary_sample %>%
+          filter(!NegControl)),
+                 y = total_count_sample,
+                 shape = Community))+
+  labs(col = "Spike_level")+
+  scale_y_log10()+
+  geom_hline(yintercept = reads_threshold)
+
+```
+
+### Uniform Community (U)
+
+```{r analysis U}
+df_targetU <- df_Sper01 %>%
+  filter(Community == "U" &
+           species_name %in% barcodes$species_name &
+                          total_count_sample > reads_threshold &
+                          !NegControl) %>%
+  mutate(prop = obiclean_weight/total_count_sample) %>%
+  left_join(summary_experiment %>% dplyr::select(species_name, sp, propU)) %>%
+  rename(prop_expected = propU)
+```
+
+### uniform in Total DNA Community (T)
+
+```{r analysis T}
+df_targetT <- df_Sper01 %>%
+  filter(Community == "T" &
+           species_name %in% barcodes$species_name &
+           total_count_sample > reads_threshold &
+           !NegControl) %>%
+  mutate(prop = obiclean_weight/total_count_sample) %>%
+  left_join(summary_experiment %>% dplyr::select(species_name, sp, propT)) %>%
+  rename(prop_expected = propT)
+```
+
+### Geometric Community (G)
+
+```{r analysis G}
+df_targetG <- df_Sper01 %>%
+  filter(Community == "G" &
+           species_name %in% barcodes$species_name &
+           total_count_sample > reads_threshold &
+           !NegControl) %>%
+  mutate(prop = obiclean_weight/total_count_sample) %>%
+  left_join(summary_experiment %>% dplyr::select(species_name, sp, propG)) %>%
+  rename(prop_expected = propG)
+```
+
+### Figure 4 of the manuscript
+
+```{r observed proportions}
+colp <- c("Expected" = "gold",
+          "Expected\nwithout\nPCR bias" = "gold",
+          "Expected\nwithout\nPCR and\nconcentration\nbiases" = "gold",
+          "Inferred\nwith model" = "darkolivegreen2")
+
+gobsU1 <- ggplot(df_targetU)+
+  geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
+                   prop))+
+      geom_point(data = summary_experiment,
+             aes(sp, 1/nrow(summary_experiment),
+                 fill = "Expected\nwithout\nPCR bias"),
+             shape = 23,
+             size = 3)+
+    geom_hline(aes(yintercept = 1/nrow(summary_experiment),
+                 col = "Expected\nwithout\nPCR and\nconcentration\nbiases"),
+             linetype = "dashed")+
+  ggtitle(TeX("Uniform community (${{M}_U}$)"))+
+  labs(y = "", x = "", fill = "", col = "")+
+  ylim(min(df_targetT$prop), max(df_targetT$prop)) +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x=element_markdown(),
+        legend.title.align=0.5)+
+  scale_color_manual(values = colp)+
+  scale_fill_manual(values = colp)+
+  scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))
+  
+
+gobsT1 <- ggplot(df_targetT)+
+  geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
+                   prop))+
+    geom_point(data = summary_experiment,
+             aes(sp, propT, fill = "Expected\nwithout\nPCR bias"),
+             shape = 23,
+             size = 3)+
+  geom_hline(aes(yintercept = 1/nrow(summary_experiment), col = "Expected\nwithout\nPCR and\nconcentration\nbiases"),
+             linetype = "dashed")+
+  ggtitle(TeX("Uniform in Total DNA community (${{M}_T}$)"))+
+  labs(y = "", x = "", fill = "", col = "")+
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x=element_markdown(),
+        legend.title.align=0.5)+
+  scale_color_manual(values = colp)+
+  scale_fill_manual(values = colp)+
+    scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))
+
+
+# gobsG1 <- ggplot(df_targetG)+
+#   geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
+#                    prop))+
+#   labs(y = "", x = "")+
+#   ggtitle("Geometric community (G)")+
+#   theme(plot.title = element_text(hjust = 0.5))+
+#   geom_point(data = summary_experiment,
+#              aes(sp, propG), shape = 23,
+#              fill = "gold", size = 3)+
+#   scale_y_log10()
+
+fig <- ggpubr::ggarrange(gobsU1, gobsT1, #gobsG1,
+                  ncol = 1,
+                  common.legend = T,
+                  legend = "right")
+annotate_figure(fig,
+                # top = text_grob("Final abundances in two mock communities with Sper01"),
+                bottom = text_grob("Species"),
+                left = text_grob("Observed reads proportions", rot = 90))
+
+# ggsave("Figures/metabar_results.pdf", units = "mm",
+#        width = 150, height = 200, dpi = 600, device = "pdf")
+```
+
+Examples of proportions
+
+```{r ptr prop}
+df_targetU %>% filter(sp == "Ptr") %>% pull(prop) %>% summary
+df_targetU %>% filter(sp == "Ptr") %>% pull(prop) %>% sd
+
+df_targetU %>% group_by(sp) %>% summarise(s = sd(prop), m = mean(prop)) %>%arrange(m)
+
+df_targetG %>% group_by(sp) %>% summarise(s = sd(prop), m = mean(prop)) %>%arrange(m)
+```
+
+
+Export to Julia to infer efficiencies
+
+```{r export julia U}
+readsU <- df_targetU %>%
+  dplyr::select(Sample, obiclean_weight, species_name) %>%
+  pivot_wider(names_from = species_name,
+              values_from = obiclean_weight) %>% ungroup %>% dplyr::select(-Sample)
+
+# write_csv(readsU, "data/reads_U.csv")
+
+readsT <- df_targetT %>%
+  dplyr::select(Sample, obiclean_weight, species_name) %>%
+  pivot_wider(names_from = species_name,
+              values_from = obiclean_weight) %>% ungroup %>% dplyr::select(-Sample)
+
+# write_csv(readsT, "data/reads_T.csv")
+
+readsG <- df_targetG %>%
+  dplyr::select(Sample, obiclean_weight, species_name) %>%
+  pivot_wider(names_from = species_name,
+              values_from = obiclean_weight,
+              values_fill = 0) %>% ungroup %>% dplyr::select(-Sample)
+
+# write_csv(readsG, "data/reads_G.csv")
+```
+
+### Ratio correction from a reference mock community (U)
+
+Correction factor is:
+
+a_s = prop_obs(s)/prop_init(s) (* constant value)
+
+then prop_infer(s) = prop_obs(s)/a_s(commuU)
+
+
+```{r correction mock}
+order_sp <- summary_experiment %>% dplyr::select(species_name, RankG) %>%
+  arrange(-RankG) %>% pull(species_name)
+
+correcU <- df_targetU %>%
+  group_by(species_name) %>%
+  summarise(correc = median(prop)/prop_expected[1])
+
+#U
+df_targetU <- df_targetU %>% left_join(correcU)
+df_targetU$prop_infer_mock <- df_targetU$prop/df_targetU$correc
+df_targetU <- df_targetU %>%
+  group_by(Sample) %>%
+  mutate(prop_infer_mock = prop_infer_mock/sum(prop_infer_mock,
+                                               na.rm = T))
+
+df_targetU$species_name <- factor(df_targetU$species_name,
+                                  levels = order_sp,
+                                  ordered = T)
+
+#T
+df_targetT <- df_targetT %>% left_join(correcU)
+df_targetT$prop_infer_mock <- df_targetT$prop/df_targetT$correc
+df_targetT <- df_targetT %>%
+  group_by(Sample) %>%
+  mutate(prop_infer_mock = prop_infer_mock/sum(prop_infer_mock,
+                                               na.rm = T))
+df_targetT$species_name <- factor(df_targetT$species_name,
+                                  levels = order_sp,
+                                  ordered = T)
+
+#G
+df_targetG <- df_targetG %>% left_join(correcU)
+df_targetG$prop_infer_mock <- df_targetG$prop/df_targetG$correc
+df_targetG <- df_targetG %>%
+  group_by(Sample) %>%
+  mutate(prop_infer_mock = prop_infer_mock/sum(prop_infer_mock,
+                                               na.rm = T))
+
+df_targetG$species_name <- factor(df_targetG$species_name,
+                                  levels = order_sp,
+                                  ordered = T)
+```
+
+
+```{r T and G corrected by U}
+
+# ginferT1 <- ggplot(df_targetT)+
+#   geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
+#                    prop_infer_mock))+
+#   geom_point(data = df_targetT %>% group_by(sp) %>%
+#                summarise(prop = median(prop)),
+#     aes(sp, prop, fill = "Observed\n(Median)"),
+#              shape = 21, size = 3)+
+#   theme(axis.text.x=element_blank())+
+#   labs(y = "", x = "",
+#        fill = "", col = "")+
+#   geom_point(data = summary_experiment,
+#              aes(sp, propT, fill = "Expected"), shape = 23,
+#              size = 3)+
+#   scale_fill_manual(values = colp)+
+#   ggtitle("Uniform in Total DNA community (T)")+
+#   theme(plot.title = element_text(hjust = 0.5))
+# 
+# ginferG1 <- ggplot(df_targetG)+
+#   geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
+#                    prop_infer_mock))+
+#   geom_point(data = df_targetG %>% group_by(sp) %>%
+#                summarise(prop = median(prop)),
+#              aes(sp, prop, fill = "Observed\n(Median)"),
+#              shape = 21, size = 3)+
+#   labs(y = "", x = "",
+#        fill = "", col = "")+
+#   geom_point(data = summary_experiment,
+#              aes(sp, propG, fill = "Expected"), shape = 23,
+#              size = 3)+
+#   scale_fill_manual(values = colp)+
+#   ggtitle("Geometric community (G)")+
+#   theme(plot.title = element_text(hjust = 0.5),
+#         legend.position = "none")+
+#   scale_y_log10()+
+#   scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))+
+#   theme(axis.text.x=element_markdown())
+# 
+# fig <- egg::ggarrange(ginferT1, ginferG1,
+#                       ncol = 1)
+# annotate_figure(fig,
+#                 top = text_grob("Corrected abundances in two mock communities with Sper01"),
+#                 bottom = text_grob("Species"),
+#                 left = text_grob("Inferred reads proportions", rot = 90))
+
+# ggsave("Figures/metabar_results_corrected.pdf", units = "mm",
+#        width = 180, height = 150, dpi = 600, device = "pdf")
+
+```
+
+Inference results: prop_infer_mock = Proportions inferred by the ratio corection established from the U community
+
+```{r inference results}
+resU1 <- df_targetU %>% group_by(species_name) %>%
+  summarise(prop = median(prop), prop_expected = prop_expected[1],
+            prop_infer_mock = median(prop_infer_mock))
+
+resT1 <- df_targetT %>% group_by(species_name) %>%
+  summarise(prop = median(prop), prop_expected = prop_expected[1],
+            prop_infer_mock = median(prop_infer_mock))
+
+resG1 <- df_targetG %>% group_by(species_name) %>%
+  summarise(sp = sp[1], prop = median(prop), prop_expected = prop_expected[1],
+            prop_infer_mock = median(prop_infer_mock))
+```
+
+### Taqman assay
+
+Open data (prepared in data_processing.Rmd)
+
+```{r open taqman}
+res_taqman <- read.csv("data/res_taqman.csv")
+kinetics <- read.csv("data/taqman_kinetics.csv")
+```
+
+Plot curves and Cq = f(concentration)
+
+```{r show taqman results}
+ggplot(kinetics)+
+  geom_line(aes(Cycle, RFU, group = Well, col = probe))
+
+ggplot(res_taqman)+
+  geom_point(aes(copies_ul, Cq, group = Well, col = probe))+
+  scale_x_log10()+
+  labs(y="Ct")+
+  ggtitle("Ct = f(log(Concentration))")
+```
+
+#### First try: linear regression
+
+```{r linear regression taqman}
+Vmix_taq <- 25 #ul
+
+res_taqman$slope <- NA
+res_taqman$intercept <- NA
+
+for (s in unique(res_taqman$probe)){
+  reg <- lm(Cq ~ log10(copies),
+            res_taqman %>%
+              filter(probe == s) %>%
+              group_by(Dilu) %>%
+              summarise(Cq = mean(Cq),
+                        copies = Vmix_taq*copies_ul[1]))
+  res_taqman[res_taqman$probe == s, "slope"] <- reg$coefficients[2]
+  res_taqman[
+    res_taqman$probe == s, "intercept"] <- reg$coefficients[1]
+}
+
+res_taqman$rate <- 10^(-1/res_taqman$slope)-1
+
+res_taqman$Mct <- 10^(log10(1+res_taqman$rate)*
+                         res_taqman$intercept)
+
+res_taqman %>% group_by(probe) %>%
+  summarise(rate = rate[1],
+            Mct = Mct[1]/1e11)
+
+```
+
+Try to infer with only 2 out of the 3 replicates : too important variability
+
+```{r 2 replicates}
+flam <- function(p){
+  10^(-1/p)-1
+}
+
+res_lm_test <- NULL
+
+for (s in unique(res_taqman$probe)){
+  for (try in 1:100){
+    reg <- lm(Cq ~ log10(copies),
+              res_taqman %>%
+                filter(probe == s & !Neg) %>%
+                group_by(Dilu) %>%
+                summarise(Cq = mean(Cq[sample(1:n(), 2)]),
+                          copies = Vmix_taq*copies_ul[1]))
+    res_lm_test <- rbind(res_lm_test,
+                         data.frame(probe = s,
+                                    slope = reg$coefficients[2]))
+  }
+}
+
+res_lm_test %>% group_by(probe) %>% summarise(min = min(slope),
+                                              max = max(slope)) %>%
+  mutate(lmin = flam(min), lmax = flam(max), gap = lmax - lmin)
+
+```
+
+#### Infer constants of the model
+
+RFU Threshold for each well
+
+```{r rfu}
+res_taqman$RFU_Cq <- NA
+
+for (i in 1:nrow(res_taqman)){
+  aux <- kinetics %>% filter(Dilu == res_taqman[i,]$Dilu &
+                      Repli == res_taqman[i,]$Repli &
+                      probe == res_taqman[i,]$probe &
+                      abs(Cycle - res_taqman[i,]$Cq)<1)
+
+res_taqman[i,"RFU_Cq"] <- (aux[2,]$RFU - aux[1,]$RFU)*
+  (res_taqman[i,]$Cq-aux[1,]$Cycle)+aux[1,]$RFU
+}
+
+res_taqman <- res_taqman %>%
+  mutate(K = Mct/(RFU_Cq/End.RFU))
+
+Mct_glob <- res_taqman %>%
+  group_by(sp) %>%
+  summarise(Mct = mean(Mct)) %>% pull(Mct) %>% mean
+
+K <- res_taqman %>%
+  group_by(sp) %>%
+  summarise(K = mean(K)) %>% pull(K) %>% sum
+
+```
+
+
+#### Computing PCR efficiencies
+
+```{r pcr efficiencies}
+efficiencies <- res_taqman %>%
+  mutate(Lambda = (Mct_glob/(Vmix_taq*copies_ul))^(1/Cq)-1)
+
+ggplot(efficiencies)+
+  geom_point(aes(probe, Lambda, col = factor(Dilu)))
+
+efficiencies %>% group_by(probe) %>% summarise(Lambda = mean(Lambda))
+efficiencies %>% group_by(sp) %>% summarise(Lambda = mean(Lambda))
+
+#lam = Lambdas = efficiencies:
+lam <- efficiencies %>% group_by(sp) %>%
+  summarise(efficiency = mean(Lambda))
+
+res_taqman <- res_taqman %>% left_join(lam)
+
+```
+
+
+#### Normalise End.RFU for Cbe
+
+To compare the 2 probes
+
+```{r normalise rfu cbe}
+x <- res_taqman %>% filter(sp == "Cbe" & Dilu < 6) %>%
+  group_by(probe, Dilu) %>%
+  summarise(end.rfu = mean(End.RFU), Cq = mean(Cq))
+
+correcCbe <- x %>% group_by(Dilu, probe) %>%
+  summarise(end.rfu = mean(end.rfu)) %>%
+  pivot_wider(names_from = probe, values_from = end.rfu) %>%
+  mutate(correc = CbeA/CbeB)
+
+
+y <- kinetics %>% filter(sp == "Cbe" & !Neg) %>% left_join(correcCbe) %>%
+  mutate(RFUbis = ifelse(probe == "CbeB", RFU*correc, RFU))
+
+ggplot(y)+
+  geom_line(aes(Cycle, RFU, col = probe, group = Well,
+                linetype = factor(Dilu)))
+
+ggplot(y)+
+  geom_line(aes(Cycle, RFUbis, col = probe, group = Well,
+                linetype = factor(Dilu)))
+
+z <- res_taqman %>% filter(sp == "Cbe" & !Neg)
+
+z$RFU_Cq <- NA
+for (i in 1:nrow(z)){
+  a <- kinetics %>% filter(Dilu == z[i,]$Dilu &
+                      Repli == z[i,]$Repli &
+                      probe == z[i,]$probe &
+                      abs(Cycle - z[i,]$Cq)<1)
+
+z[i,"RFU_Cq"] <- (a[2,]$RFU - a[1,]$RFU)*
+  (z[i,]$Cq-a[1,]$Cycle)+a[1,]$RFU
+}
+
+seuil_Cq <- mean(z$RFU_Cq)
+
+fCq <- function(ampli){
+  c2 <- which(ampli >= seuil_Cq)[1]
+  c1 <- c2-1
+  Cq <- (seuil_Cq - ampli[c1]+(ampli[c2] - ampli[c1])*c1)/
+    (ampli[c2] - ampli[c1])
+  Cq
+}
+
+res <- NULL
+for (p in unique(y$Well)){
+  res <- rbind(res,
+               data.frame(Well = p,
+                          probe = y[y$Well == p,]$probe[1],
+                          Cq = fCq(y[y$Well == p,]$RFU),
+                          Cqbis = fCq(y[y$Well == p,]$RFUbis)))
+}
+
+ggplot(res_taqman %>% filter(!Neg & sp == "Cbe"))+
+  geom_point(aes(Dilu, Cq, col = probe))
+```
+
+
+#### Amplification bias
+
+Comparing the 3 species
+
+```{r prop commu 3 species}
+
+qmet <- df_targetU %>%
+  filter(species_name %in% c("Capsella_bursa-pastoris",
+                             "Carpinus_betulus",
+                             "Fraxinus_excelsior"))
+
+ggplot(qmet)+
+  geom_boxplot(aes(species_name,
+                   prop))+
+  theme(axis.text.x = element_text(angle = 90))
+                   
+qmet %>% group_by(species_name) %>%
+  summarise(prop = mean(prop)) %>% mutate(prop = prop/sum(prop))
+
+```
+
+### Proportions corrected with PCR efficiencies
+
+Proportions inferred in Julia using PCR efficiencies
+
+Run inference_metabarcoding.jl (functions) and inference_pcr_efficiency.jl (inference of efficiencies from U and proportions in T and G)
+
+Inference with the flimo method
+- reads in U used to infer efficiencies
+- efficiencies used to infer proportions in T and G
+
+#### Efficiencies
+
+```{r efficiencies U Julia}
+#Inferred efficiencies
+efficiencies <- t(read_csv("data/efficiencies_U.csv"))
+colnames(efficiencies) <- colnames(readsU)
+
+summary_experiment <- summary_experiment %>%
+  left_join(efficiencies %>%
+              as_tibble() %>%
+              pivot_longer(1:13, names_to = "species_name",
+                           values_to = "efficiencies"))
+```
+#### Table 2
+
+```{r}
+
+resU1 %>% dplyr::select(species_name, prop_expected, prop)
+
+#Efficiencies by Taqman
+lam
+#Normalized efficiencies
+efficiencies %>% group_by(probe) %>%
+    summarise(efficiency = mean(Lambda)) %>%
+  mutate(efficiency = efficiency/lam$efficiency[3]*0.924)
+
+summary_experiment %>% arrange(RankG) %>%
+  dplyr::select(species_name, efficiencies)
+```
+
+
+#### Inferred proportions
+
+```{r results julia T}
+inferT <- read.csv("data/prop_inferT.csv")
+colnames(inferT) <- colnames(readsT)
+resT1 <- resT1 %>%
+  left_join(inferT %>% pivot_longer(everything(),
+                                    names_to = "species_name",
+                                    values_to = "prop_infer_Lambda")) %>%
+  arrange(-dplyr::row_number())
+
+```
+
+```{r results julia G}
+inferG <- read.csv("data/prop_inferG.csv")
+colnames(inferG) <- colnames(readsG)
+resG1 <- resG1 %>%
+  left_join(inferG %>% pivot_longer(everything(),
+                                    names_to = "species_name",
+                                    values_to = "prop_infer_Lambda")) %>%
+  arrange(-dplyr::row_number())
+```
+
+
+
+### Table 3
+
+#### Proportions
+
+```{r Table 3}
+resT1
+resG1
+```
+
+#### RMSE values
+
+RMSE to compare observed/corrected vs expected proportions
+Either absolute or relative
+
+```{r rmse}
+
+AbsErr <- function(p_observed, p_expected){
+  sqrt(sum((p_observed-p_expected)^2)/length(p_observed))
+}
+
+RelErr <- function(p_observed, p_expected){
+  sqrt(sum(((p_observed-p_expected)/p_expected)^2)/length(p_observed))
+}
+
+#U
+summary(resU1$prop)
+
+AbsErr(resU1$prop, resU1$prop_expected)
+RelErr(resU1$prop, resU1$prop_expected)
+
+
+#T
+summary(resT1$prop)
+
+AbsErr(resT1$prop, resT1$prop_expected)
+AbsErr(resT1$prop_infer_mock, resT1$prop_expected)
+AbsErr(resT1$prop_infer_Lambda, resT1$prop_expected)
+
+RelErr(resT1$prop, resT1$prop_expected)
+RelErr(resT1$prop_infer_mock, resT1$prop_expected)
+RelErr(resT1$prop_infer_Lambda, resT1$prop_expected)
+
+
+#RMSE of T if it is considered as a uniform community
+AbsErr(resT1$prop, resU1$prop_expected)
+RelErr(resT1$prop, resU1$prop_expected)
+
+
+#G
+summary(resG1$prop)
+
+AbsErr(resG1$prop, resG1$prop_expected)
+AbsErr(resG1$prop_infer_mock, resG1$prop_expected)
+AbsErr(resG1$prop_infer_Lambda, resG1$prop_expected)
+
+RelErr(resG1$prop, resG1$prop_expected)
+RelErr(resG1$prop_infer_mock, resG1$prop_expected)
+RelErr(resG1$prop_infer_Lambda, resG1$prop_expected)
+```
+
+#### Hill numbers
+
+```{r}
+#Hill
+D <- function(ps, q){
+  ps <- ps/sum(ps)
+  ps <- ps[ps>0]
+  ifelse(q == 1, exp(-sum(ps*log(ps))), sum(ps^q)^(1/(1-q)))
+}
+
+#Community T
+
+D(resT1$prop_expected, 1)
+D(resT1$prop, 1)
+D(resT1$prop_infer_mock, 1)
+D(resT1$prop_infer_Lambda, 1)
+
+D(resT1$prop_expected, 2)
+D(resT1$prop, 2)
+D(resT1$prop_infer_mock, 2)
+D(resT1$prop_infer_Lambda, 2)
+
+#Community G
+
+D(resG1$prop_expected, 1)
+D(resG1$prop, 1)
+D(resG1$prop_infer_mock, 1)
+D(resG1$prop_infer_Lambda, 1)
+
+D(resG1$prop_expected, 2)
+D(resG1$prop, 2)
+D(resG1$prop_infer_mock, 2)
+D(resG1$prop_infer_Lambda, 2)
+
+```
+
+Plot proportions for G
+
+```{r G corrected by U}
+ginferG1 <- ggplot(df_targetG)+
+  geom_boxplot(aes(factor(sp, levels = order_short,
+                          ordered = T),
+                   prop))+
+    geom_point(data = summary_experiment,
+             aes(sp, propG, fill = "Expected"), shape = 23,
+             size = 2)+
+    geom_point(data = resG1, aes(sp, prop_infer_Lambda, fill = "Inferred\nwith model"),
+             shape = 23, size = 2)+
+  labs(y = "Proportions", x = "Species",
+       fill = "", col = "")+
+  scale_fill_manual(values = colp)+
+  ggtitle("Abundances in the Geometric community (G)")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  scale_y_log10()+
+  scale_x_discrete(labels= function(x) highlight(x, "Cb|Fe"))+
+  theme(axis.text.x=element_markdown())
+
+ginferG1
+
+# ggsave("Figures/metabar_results_corrected_G.png", units = "mm",
+#        width = 150, height = 90, dpi = 600)
+
+```
+
+## Figure 5 of the manuscript: impact of efficiency variations
+
+Simulated amplification to quantify the effect of 
+efficiency differences.
+
+### Preparing simulations
+
+New function to simulate PCR with multiple species
 
 ```{r simu pcr 2 species}
+pcr_sim <- function(m0=1,
+                    lambda=rep(1, length(m0)),
+                    K=1e11,
+                    cycles = 40,
+                    satu = c("log", "meca"),
+                    c = 0.9,
+                    e = 1.1,
+                    delta = 1) {
+  param <- data.frame(m0 = m0,
+                      lambda = lambda)
+  nspecies <- nrow(param)
+  
+  #Number of molecules at each cycle for each species
+  kinetics <- matrix(0, nrow = cycles+1, ncol = nspecies)
+  if (delta <= 1){
+    for (m in 1:nspecies){
+      kinetics[1,m] <- rpois(1, m0[m])
+    }
+  } else {
+    for (m in 1:nspecies){
+      kinetics[1,m] <- rnbinom(1, m0[m]/delta, 1/delta)
+    }
+  }
+  for (cyc in 2:(1+cycles)) {
+    charge <- sum(kinetics[cyc-1,]-kinetics[1,])/K
+    for (m in 1:nspecies) {
+      lam <- lambda[m]
+      mc <- kinetics[cyc-1,m] #Molecules of s at previous cycle
+      if(satu[1] == "meca"){
+        gamma <- function(x){
+          2/(1+sqrt(1-4*c^2*x*(1-x)))
+        }
+        lam <- lam*c*gamma(charge)*(1-charge)*(e-charge)
+      }
+      else{ #logistic
+        lam <- max(0, lam*(1-charge))
+      }
+      #Number of created molecules
+      nb <- rbinom(1, mc, lam)
+      kinetics[cyc,m] <- kinetics[cyc-1,m]+nb
+    }
+  }
+  return(kinetics)
+}
+
 nspecies <- 2
 ncycles <- 40
 M0 = rep(2.5e5/nspecies, nspecies)
 
+#Tested values
 lam1 <- 1
 Lam2 <- seq(0.85, 1, by = 0.001)
 
 res <- NULL
-
-sim <- NULL
 for (lam2 in Lam2){
-  p <- simu_pcr(m0=M0, lambda=c(lam1, lam2), K=K,
+  p <- pcr_sim(m0=M0, lambda=c(lam1, lam2), K=K,
                 cycles = ncycles)
   res <- rbind(res, p[ncycles+1,])
 }
 
-efficiencies <- t(read_csv("data/efficiencies_U.csv"))
-colnames(efficiencies) <- colnames(readsU)
-summary_dd <- summary_dd %>% left_join(efficiencies %>% as_tibble() %>% pivot_longer(1:13, names_to = "species_name", values_to = "efficiencies"))
-
+#Proportions of the 2 species
 prop2 <- df_targetU %>% group_by(sp) %>%
   summarise(propU = median(prop)) %>% ungroup() %>%
-  mutate(propU = propU/(propU+propU[11])) %>% #11 = Rc...
-  left_join(summary_dd %>% dplyr::select(sp, efficiencies)) %>%
+  mutate(propU = propU/(propU+propU[11])) %>% #11 = Rca
+  left_join(summary_experiment %>% dplyr::select(sp, efficiencies)) %>%
   mutate(deff = 1-efficiencies) %>% filter(sp != "Rc")
 ```
-figure 5 of the manuscript
+
+Figure:
 
 ```{r simu pcr 2 species : fig}
-
+#Labels positions
 prop2$labelx <- prop2$deff - 0.0021
-prop2[prop2$sp == "Rfe","labelx"] <- prop2[prop2$sp == "Rfe","labelx"]+0.0042
-prop2[prop2$sp == "Lco","labelx"] <- prop2[prop2$sp == "Lco","labelx"]+0.0042
-prop2[prop2$sp == "Lxy","labelx"] <- prop2[prop2$sp == "Lxy","labelx"]+0.0042
-prop2[prop2$sp == "Aal","labelx"] <- prop2[prop2$sp == "Aal","labelx"]+0.0038
-prop2[prop2$sp == "Bme","labelx"] <- prop2[prop2$sp == "Bme","labelx"]+0.0037
-prop2[prop2$sp == "Cbe","labelx"] <- prop2[prop2$sp == "Cbe","labelx"]+0.0021
+prop2[prop2$sp == "Rfe","labelx"] <- prop2[prop2$sp == "Rfe","labelx"]+
+  0.0042
+prop2[prop2$sp == "Lco","labelx"] <- prop2[prop2$sp == "Lco","labelx"]+
+  0.0042
+prop2[prop2$sp == "Lxy","labelx"] <- prop2[prop2$sp == "Lxy","labelx"]+
+  0.0042
+prop2[prop2$sp == "Aal","labelx"] <- prop2[prop2$sp == "Aal","labelx"]+
+  0.0038
+prop2[prop2$sp == "Bme","labelx"] <- prop2[prop2$sp == "Bme","labelx"]+
+  0.0037
+prop2[prop2$sp == "Cbe","labelx"] <- prop2[prop2$sp == "Cbe","labelx"]+
+  0.0021
 
 
 ggplot()+
@@ -1292,7 +1253,8 @@ ggplot()+
             size = 4)+
   geom_text(aes(0.115, 0.27, label = "Second species", col = "other"),
             size = 4)+
-  geom_text(data = prop2 %>% filter(sp != "Rca") %>% arrange(efficiencies),
+  geom_text(data = prop2 %>%
+              filter(sp != "Rca") %>% arrange(efficiencies),
               aes(labelx, 1, label = sp),
             col = "grey50",
             size = 3, angle = 90)+
@@ -1314,8 +1276,13 @@ ggplot()+
 
 # rep(c(1,0.95), 6)
 
-# ggsave(filename = "simulambda.pdf", units = "mm",
-#        height = 120, width = 180, device = "pdf", dpi = 600)
+# ggsave(filename = "Figures/simu_efficiencies.pdf", units = "mm",
+#        height = 100, width = 150, device = "pdf", dpi = 600)
 
 ```
 
+### Supplementary Table 2
+
+```{r sup table 2}
+summary_experiment %>% arrange(RankG)
+```

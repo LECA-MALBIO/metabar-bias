@@ -1,6 +1,6 @@
 
 ---
-title: 'How much PCR amplification is biasing DNA metabarcoding results ? - data processing'
+title: 'Towards quantitative DNA Metabarcoding: A method to overcome PCR amplification bias - data processing'
 author:
   - name: Sylvain Moinard
     institute: leca
@@ -23,10 +23,15 @@ author:
 institute:
   - leca: Univ. Grenoble-Alpes, Univ. Savoie Mont Blanc, CNRS, LECA, 38000, Grenoble, France.
   - ijf: Univ. Grenoble-Alpes, CNRS, Institut Joseph Fourier, 38000, Grenoble, France.
-output: html_document
+output:
+  html_document:
+    toc: true
+    theme: united
 ---
 
+# Setup
 
+This file is used to process the data used for the paper analyses.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -34,7 +39,11 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(readxl)
 library(tidyverse)
+```
 
+Install R package ROBIFastread
+
+```{r setup ROBIFastread, include=FALSE}
 #install_url("https://git.metabarcoding.org/obitools/obitools4/robireadfasta")
 library(ROBIFastread)
 ```
@@ -45,33 +54,49 @@ library(ROBIFastread)
 
 Salvia pratensis has a different barcode as in the database (one insertion)
 
-```{r open reference}
-barcodes1 <- read_excel("data/new_plant_positive_control.xlsx")[,c(2,4:6)]
-names(barcodes1) <- c("species_name", "sequence", "length", "gc_content")
+```{r open barcodes reference}
+#Open file with barcodes:
+barcodes <- read_excel("data/new_plant_positive_control.xlsx")[,c(2,4:6)]
 
-barcodes1[barcodes1$species_name ==
-            "Salvia_pratensis",]$sequence <- "atcctgttttctcaaaacaaaggttcaaaaaacgaaaaaaaaaaag"
+names(barcodes) <- c("species_name", "sequence", "length", "gc_content")
+
+#Modification
+barcodes[barcodes$species_name ==
+            "Salvia_pratensis",]$sequence <-
+  "atcctgttttctcaaaacaaaggttcaaaaaacgaaaaaaaaaaag"
+
+barcodes <- barcodes %>% filter(species_name != "Rumex_acetosa")
 
 ```
 
 ## DNA extraction
 
+The extraction file contains total DNA concentration assayed by Qubit
+
 ```{r extraction}
-extraction <- read_excel(
-  "data/dosage extraction plantes.xlsx")
+#Open/Process extraction file:
+extraction <- read_excel("data/dosage extraction plantes.xlsx")
 extraction <- extraction[-nrow(extraction),]
-extraction <- extraction[,-(4:9)]
+extraction <- extraction %>% dplyr::select(Espece,
+                                           Sample,
+                                           `concentration (ng/µl`) %>%
+  rename(CDNA_sample = `concentration (ng/µl`,
+         species_name = Espece)
+
+# write.csv(extraction, "data/extraction.csv", row.names = F)
 ```
 
 
 ## ddPCR data
 
-Open, clean, summarise ddPCR data
+Open, clean, summarise ddPCR data (output of the Quantasoft Software, Biorad)
 
 ```{r ddPCR data}
-#First file
+#First file (Quantasoft)
 dataddpcr1 <- read.csv("data/QMETABAR_MOINARD1204_manual.csv",
                        header=FALSE)
+
+#Process file
 colnames(dataddpcr1) <- dataddpcr1[1,]
 dataddpcr1 <- dataddpcr1[-1,c(1,7,8,16,22)]
 
@@ -79,6 +104,7 @@ dataddpcr1$Sample <- NA
 dataddpcr1$sp <- NA
 dataddpcr1$Dilu <- NA
 
+#Plate:
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "01",]$Sample <- 100
 dataddpcr1[substr(dataddpcr1$Well, 2, 3) == "01",]$sp <- "Spk1"
 
@@ -155,14 +181,14 @@ dataddpcr1[dataddpcr1$Status == "CHECK",]$Concentration <-
   log(dataddpcr1[dataddpcr1$Status == "CHECK",]$AcceptedDroplets/
         dataddpcr1[dataddpcr1$Status == "CHECK",]$Negatives)/vdroplet
 
-#Second file
-
+#Second file (Quantasoft)
 dataddpcr2 <- read.csv("data/QMETABAR_MOINARD_140422_manual.csv",
                         header=FALSE)
+#Process file
 colnames(dataddpcr2) <- dataddpcr2[1,]
 dataddpcr2 <- dataddpcr2[-1,c(1,4,6,7,8,16,22)]
 
-colnames(dataddpcr2)[3] <- "Dilu" #Target
+colnames(dataddpcr2)[3] <- "Dilu"
 dataddpcr2$sp <- NA
 dataddpcr2$Sample <- as.numeric(dataddpcr2$Sample)
 
@@ -241,22 +267,19 @@ maxDNA <- 0.25 *Vdna_dd/Vmix_dd #ng/ul
 dataddpcr$TotalDNA <- maxDNA/10^(dataddpcr$Dilu-1)
 
 dataddpcr <- dataddpcr %>%
-  mutate(Concentration_copies_ng = Concentration/TotalDNA)
+  mutate(Concentration_copies_ng = Concentration/TotalDNA) %>%
+  filter(Used & Sample < 100) #Keep only replicates used in this study
+
+# write_csv(dataddpcr, "data/dataddpcr.csv")
 
 summary_dd <- dataddpcr %>% filter(Used & Sample < 100) %>%
   group_by(Sample) %>%
   summarise(sp = sp[1],
-            Mean = mean(Concentration/TotalDNA),
-            min = min(Concentration/TotalDNA),
-            max = max(Concentration/TotalDNA)) %>%
-  left_join(extraction %>% dplyr::select(Espece, Sample, `concentration (ng/µl`)) %>%
-  rename(CDNA_sample = `concentration (ng/µl`,
-         Cmolecules_ref = Mean,
-         species_name = Espece) %>%
+            Molecules_ng = mean(Concentration/TotalDNA)) %>%
+  left_join(extraction) %>%
   dplyr::select(Sample, species_name, sp,
-                Cmolecules_ref, CDNA_sample)
+                Molecules_ng, CDNA_sample)
 
-# write_csv(dataddpcr, "data/dataddpcr.csv")
 ```
 ## Metabarcoding data processing
 
@@ -264,9 +287,9 @@ Processing the data with OBITools version 4
 (https://git.metabarcoding.org/obitools/obitools4/obitools4)
 
 Three communities:
-* L1 = uniform in Total DNA (renamed T in the paper)
-* G1 = Geometric
-* U1 = Uniform
+* L1 (library 1746) = uniform in Total DNA (renamed T in the paper)
+* G1 (library 1748) = Geometric
+* U1 (library 1750) = Uniform
 
 ### Bash commands
 
@@ -281,6 +304,9 @@ Paired-end data
 % gobipairing -F 220930_NB501850_A_L1-4_GWM-1750_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1750_R2.fastq.gz > GWM-1750.paired
 
 #### Convert json (made by metabase api) to ngsfilter
+
+Uses script format_ngsfilter.py
+Assigns tags to replicates
 
 % python3 format_ngsfilter_sylvain.py ngs_filter_tube_L1_EC_QMETABAR_210722.json GWM-1746_L1
 
@@ -301,13 +327,14 @@ Assigns sequence records to the corresponding experiment/sample based on DNA tag
 #### Gobiuniq
 
 Groups and dereplicates sequences
-Merge the libraries
+Merges the libraries
 
 % gobiuniq -m direction -m sample --on-disk GWM_1746.demultiplex GWM_1748.demultiplex GWM_1750.demultiplex > GWM_Sper01.uniq
 
 #### Gobigrep
 
 Filters sequence file
+Removes singletons, too short and too long variants 
 
 % gobigrep -c 2 -l 25 -L 75 GWM_Sper01.uniq > GWM_Sper01.grep
 
@@ -319,43 +346,41 @@ Tags a set of sequences for PCR/sequencing errors identification
 
 #### Gobicount
 
-Reads / Variants
+Counts Reads / Variants
+
+Library L1/1746
 
 % gobicount GWM-1746.paired
 3352859 / 3352859
-
 % gobicount GWM_1746.demultiplex
 3043811 / 3043811
-
 % gobicount unassigned46
 309048 / 309048
 
+Library G1/1748
+
 % gobicount GWM-1748.paired
 4025048 / 4025048
-
 % gobicount GWM_1748.demultiplex
 3683622 / 3683622
-
 % gobicount unassigned48
 341426 / 341426
 
+Library U1/1750
 
 % gobicount GWM-1750.paired
 3910259 / 3910259
-
 % gobicount GWM_1750.demultiplex
 3618993 / 3618993
-
 % gobicount unassigned50
 291266 / 291266
 
+Merged libraries
 
 % gobicount GWM_Sper01.uniq
 151109 / 10346426
-
 % gobicount GWM_Sper01.grep
 28371 / 10202369
-
 % gobicount GWM_Sper01.clean
 28371 / 10202369
 
@@ -366,7 +391,9 @@ https://git.metabarcoding.org/obitools/obitools4/robireadfasta
 
 ### Import Metabarcoding data
 
-The data come from a larger experiment. We remove every replicate containing Spike molecules.
+Data come from a larger experiment. Every replicate containing Spike molecules is removed.
+
+Preparing dataframe:
 
 ```{r open metabarcoding data}
 data_Sper01 <- read_obifasta("data/GWM_Sper01.clean")
@@ -375,13 +402,13 @@ weights <- extract_readcount(data_Sper01,
                     key = "obiclean_weight")
 
 reads <- extract_readcount(data_Sper01)
+
 df_reads <- Matrix::summary(reads)
 df_reads <- data.frame(Sample = rownames(reads)[df_reads$i],
            id = colnames(reads)[df_reads$j],
            reads = df_reads$x)
 
 df_Sper01 <- Matrix::summary(weights)
-
 df_Sper01 <- data.frame(Sample = rownames(weights)[df_Sper01$i],
            id = colnames(weights)[df_Sper01$j],
            obiclean_weight = df_Sper01$x) %>%
@@ -390,14 +417,18 @@ df_Sper01 <- data.frame(Sample = rownames(weights)[df_Sper01$i],
   mutate(Community = substr(Sample, 1, 1),
          NegControl = Community == "P")
 
-df_Sper01[df_Sper01$Community == "P", "Community"] <- substr(df_Sper01[df_Sper01$Community == "P",]$Sample, 8, 8)
+#Rename Communities
+df_Sper01[df_Sper01$Community == "P", "Community"] <-
+  substr(df_Sper01[df_Sper01$Community == "P",]$Sample, 8, 8)
 df_Sper01[df_Sper01$Community == "L", "Community"] <- "T"
 
+#Spike levels
 df_Sper01$Spike_level <- NA
-df_Sper01[!df_Sper01$NegControl,"Spike_level"] <- as.numeric(substr(df_Sper01[!df_Sper01$NegControl,]$Sample, 4, 4))
-
+df_Sper01[!df_Sper01$NegControl,"Spike_level"] <-
+  as.numeric(substr(df_Sper01[!df_Sper01$NegControl,]$Sample, 4, 4))
 df_Sper01[df_Sper01$NegControl,"Spike_level"] <- as.numeric(substr(df_Sper01[df_Sper01$NegControl,]$Sample, 12, 12))
 
+#Keep replicates with no Spike
 df_Sper01 <- df_Sper01 %>% filter(Spike_level == 1)
 
 summary_sample <- df_Sper01 %>%
@@ -415,13 +446,15 @@ summary_species <- df_Sper01 %>%
 
 summary_species$seq_rank <- 1:nrow(summary_species)
 
+#Data with metadata
 df_Sper01 <- df_Sper01 %>% left_join(summary_sample[,1:2]) %>%
   left_join(summary_species) %>%
-  left_join(barcodes1) %>%
+  left_join(barcodes) %>%
   arrange(desc(count))
 
 df_Sper01[is.na(df_Sper01$species_name),"species_name"] <- as.character(df_Sper01[is.na(df_Sper01$species_name),]$seq_rank)
 
+#Output:
 # write_csv(df_Sper01, "data/df_Sper01.csv")
 
 ```
@@ -433,11 +466,10 @@ df_Sper01 %>% filter(NegControl) %>%
   group_by(Sample) %>%
   summarise(sum(reads))
 
-df_Sper01 %>% filter(Sample == "PCRNeg_G1_R1") %>% arrange(-reads) #%>% View
-df_Sper01 %>% filter(Sample == "PCRNeg_L1_R1") %>% arrange(-reads) #%>% View
-df_Sper01 %>% filter(Sample == "PCRNeg_U1_R1") %>% arrange(-reads) #%>% View
+# df_Sper01 %>% filter(Sample == "PCRNeg_G1_R1") %>% arrange(-reads) #%>% View
+# df_Sper01 %>% filter(Sample == "PCRNeg_L1_R1") %>% arrange(-reads) #%>% View
+# df_Sper01 %>% filter(Sample == "PCRNeg_U1_R1") %>% arrange(-reads) #%>% View
 ```
-
 
 Open data before filtering (grep, clean)
 
@@ -481,126 +513,216 @@ Open data before filtering (grep, clean)
 ```
 
 
-Export data to Julia for Taqman analysis
+Exports data to Julia for Taqman analysis
 
 ```{r export julia}
 reads_threshold <- 5000
 
-##Commu U
-auxU <- df_Sper01 %>% filter(Community == "U" &
-                                   species_name %in% barcodes1$species_name &
-                        species_name != "Rumex_acetosa" &
-                          total_count_sample > reads_threshold &
-                          !NegControl) %>%
+##Community U
+auxU <- df_Sper01 %>%
+  filter(Community == "U" &
+         species_name %in% barcodes$species_name &
+         total_count_sample > reads_threshold &
+         !NegControl) %>%
   filter(species_name %in%
-           c("Fraxinus_excelsior", "Carpinus_betulus", "Capsella_bursa-pastoris")) %>%
+           c("Fraxinus_excelsior",
+             "Carpinus_betulus",
+             "Capsella_bursa-pastoris")) %>%
   dplyr::select(species_name, obiclean_weight, Sample) %>%
   arrange(species_name) %>%
   pivot_wider(names_from = species_name, values_from = obiclean_weight)
 
+#Matrix:
 matU <- as.matrix(auxU[,-1])
 # write.csv(matU, "data/dfSper01U_taq.csv")
 
-##Commu T
-auxT <- df_Sper01 %>% filter(Community == "T" &
-                                   species_name %in% barcodes1$species_name &
-                        species_name != "Rumex_acetosa" &
-                          total_count_sample > reads_threshold &
-                          !NegControl) %>%
+##Community T
+auxT <- df_Sper01 %>%
+  filter(Community == "T" &
+         species_name %in% barcodes$species_name &
+         total_count_sample > reads_threshold &
+         !NegControl) %>%
   filter(species_name %in%
-           c("Fraxinus_excelsior", "Carpinus_betulus", "Capsella_bursa-pastoris")) %>%
+           c("Fraxinus_excelsior",
+             "Carpinus_betulus",
+             "Capsella_bursa-pastoris")) %>%
   dplyr::select(species_name, obiclean_weight, Sample) %>%
   arrange(species_name) %>%
   pivot_wider(names_from = species_name, values_from = obiclean_weight)
+
+#Matrix
 matT <- as.matrix(auxT[,-1])
 # write.csv(matT, "data/dfSper01T_taq.csv")
 
-##Commu G
-auxG <- df_Sper01 %>% filter(Community == "G" &
-                                   species_name %in% barcodes1$species_name &
-                        species_name != "Rumex_acetosa" &
-                          total_count_sample > reads_threshold &
-                          !NegControl) %>%
+##Community G
+auxG <- df_Sper01 %>%
+  filter(Community == "G" &
+         species_name %in% barcodes$species_name &
+         total_count_sample > reads_threshold &
+         !NegControl) %>%
   filter(species_name %in%
-           c("Fraxinus_excelsior", "Carpinus_betulus", "Capsella_bursa-pastoris")) %>%
+           c("Fraxinus_excelsior",
+             "Carpinus_betulus",
+             "Capsella_bursa-pastoris")) %>%
   dplyr::select(species_name, obiclean_weight, Sample) %>%
   arrange(species_name) %>%
   pivot_wider(names_from = species_name, values_from = obiclean_weight)
+
+#Matrix:
 matG <- as.matrix(auxG[,-1])
 # write.csv(matG, "data/dfSper01G_taq.csv")
-
 ```
 
 ## Taqman qPCR
 
+### Preparing the taqman experiment
+
 ```{r pipeline taqman}
+#Keep the 3 species analysed
 taqman <- summary_dd %>%
-  filter(Sample %in% c(10,12, 26)) %>%
-  dplyr::select(Sample, species_name, sp, Cmolecules_ref, CDNA_sample) %>%
+  filter(Sample %in% c(10, 12, 26)) %>%
   distinct(Sample, .keep_all = TRUE)
 
 #Reference concentration = sample Cbe 10
 
-#3rd level concentration
-cref_taqman <- 2.484696e-03 #ng/ul total DNA
+#Max concentration level (sample)
+cref_taqman <- 2.485e-01*Vdna_dd/Vmix_dd #ng/ul total DNA
 
 #5-fold serial dilution
 #Concentration (total DNA) of each dilution level
-cref_taqman*c(25,5,1,1/5,1/25)
+cref_taqman/5^seq(0, 4)
 
 #Copies/ul at cref_taqman in the sample
-taqman[taqman$Sample == 10,]$Cmolecules_ref*cref_taqman/CtotDNA_ref
+taqman[taqman$Sample == 10,]$Molecules_ng*cref_taqman
 
-Vdna_taq <- 5 #ul
-Vmix_taq <- 25 #ul
+Vdna_taq <- 5 #Volume of DNA solution in ul
+Vmix_taq <- 25 #Volume of mix in ul
 
 #Copies/ul at cref_taqman in the taqman mix
-taqman[taqman$Sample == 10,]$Cmolecules_ref*
-  cref_taqman/CtotDNA_ref*Vdna_taq/Vmix_taq
+taqman[taqman$Sample == 10,]$Molecules_ng*
+  cref_taqman*Vdna_taq/Vmix_taq
 
-moc_well <- taqman[taqman$Sample == 10,]$Cmolecules_ref*
-  cref_taqman*25/CtotDNA_ref*Vdna_taq
+#Max number of molecules in the well
+moc_well <- taqman[taqman$Sample == 10,]$Molecules_ng*
+  cref_taqman*Vdna_taq
 
-moc_tot <- moc_well*35 #Molecules for the whole experiment of each species
+#3 replicates* 4 probes = 12 wells/dilution
+# 12*sum(1/5^seq(0,4)) #effective number of wells at cref
+#we choose 17.5 with margin
 
+#Number of molecules for the whole experiment of each species
+# moc_tot <- moc_well*17.5
+
+#Concentration 1 (most concentrated)
 taqman1 <- taqman
 taqman1$mix <- 1
-taqman1$copies_ul <- moc_tot/175*Vdna_taq/Vmix_taq
-taqman1$CDNA_well <- taqman1$copies_ul*
-  CtotDNA_ref/taqman$Cmolecules_ref
+taqman1$copies_ul <- moc_well/Vmix_taq #copies/ul in well
+taqman1$CDNA_well <- taqman1$copies_ul/taqman$Molecules_ng #concentration total DNA ng/ul in the well
 
+#Concentration 2
 taqman2 <- taqman
 taqman2$mix <- 2
 taqman2$copies_ul <- taqman1$copies_ul/5
 taqman2$CDNA_well <- taqman1$CDNA_well/5
 
+#Concentration 3
 taqman3 <- taqman
 taqman3$mix <- 3
 taqman3$copies_ul <- taqman2$copies_ul/5
 taqman3$CDNA_well <- taqman2$CDNA_well/5
 
+#Concentration 4
 taqman4 <- taqman
 taqman4$mix <- 4
 taqman4$copies_ul <- taqman3$copies_ul/5
 taqman4$CDNA_well <- taqman3$CDNA_well/5
 
+#Concentration 5
 taqman5 <- taqman
 taqman5$mix <- 5
 taqman5$copies_ul <- taqman4$copies_ul/5
 taqman5$CDNA_well <- taqman4$CDNA_well/5
 
+#Export Taqman prior data
 taqman <- rbind(taqman1, taqman2, taqman3, taqman4, taqman5)
-
+taqman[taqman$sp == "Fe","sp"] <- "Fex"
 # write_csv(taqman, "data/taqman.csv")
 ```
 
+### Process results
+
+```{r taqman results}
+endpoint <- read.csv2("data/SPER01_End_Point_res.csv")
+endpoint <- endpoint[,c("Well", "End.RFU")]
+
+ampli <- read.csv2("data/SPER01_ampli_res.csv")[,-1]
+
+cq <- read.csv2("data/SPER01_Cq_res.csv")
+cq <- cq[cq$Fluor == "FAM",c("Well", "Cq")]
+
+
+kinetics <- ampli %>%
+  pivot_longer(!Cycle, names_to = "Well",
+               values_to = "RFU")
+
+kinetics$Dilu <- match(substr(kinetics$Well, 1, 1), LETTERS)
+kinetics$Repli <- as.integer(substr(kinetics$Well, 2,
+                                    nchar(kinetics$Well)))
+kinetics$probe <- "Fex"
+kinetics[kinetics$Repli <= 9, "probe"] <- "Cbp" 
+kinetics[kinetics$Repli <= 6, "probe"] <- "CbeB"
+kinetics[kinetics$Repli <= 3, "probe"] <- "CbeA"
+
+kinetics$sp <- "Fex"
+kinetics[kinetics$Repli <= 9, "sp"] <- "Cbp" 
+kinetics[kinetics$Repli <= 6, "sp"] <- "Cbe"
+kinetics[kinetics$Repli <= 3, "sp"] <- "Cbe"
+
+kinetics <- kinetics %>% filter(Dilu <= 6) %>%
+  mutate(Neg = (Dilu == 6))
+
+res_taqman <- cq %>% left_join(endpoint)
+
+res_taqman$Dilu <- match(substr(res_taqman$Well, 1, 1), LETTERS)
+res_taqman$Repli <- as.integer(substr(res_taqman$Well, 2,
+                                      nchar(res_taqman$Well)))
+
+res_taqman$probe <- "Fex"
+res_taqman[res_taqman$Repli <= 9, "probe"] <- "Cbp" 
+res_taqman[res_taqman$Repli <= 6, "probe"] <- "CbeB"
+res_taqman[res_taqman$Repli <= 3, "probe"] <- "CbeA"
+
+res_taqman$sp <- "Fex"
+res_taqman[res_taqman$Repli <= 9, "sp"] <- "Cbp" 
+res_taqman[res_taqman$Repli <= 6, "sp"] <- "Cbe"
+res_taqman[res_taqman$Repli <= 3, "sp"] <- "Cbe"
+
+res_taqman <- res_taqman %>%
+  filter(Dilu <= 6) %>% mutate(Neg = (Dilu == 6))
+
+res_taqman <- res_taqman %>%
+  left_join(taqman,
+            by = c("sp" = "sp", "Dilu" = "mix"))
+
+# write.csv(res_taqman %>% filter(!Neg), "data/res_taqman.csv",
+#           row.names = F)
+
+# write.csv(kinetics %>% filter(!Neg), "data/taqman_kinetics.csv",
+#           row.names = F)
+```
+
+
 ## Tags for metabarcoding PCR
 
+Open file to check tags
+
 ```{r metabarcoding tags}
+#Forward
 primers1 <- read.table("data/DEL0455463409_bis.csv",
                        header = T, sep = ",", na.strings = c("N/A", "-"))
 primers1 <- primers1[,-which(is.na(primers1[1,]))]
 
+#Reverse
 primers2 <- read.table("data/DEL0455483280_bis.csv",
                        header = T, sep = ",", na.strings = c("N/A", "-"))
 primers2 <- primers2[,-which(is.na(primers2[1,]))]
@@ -610,9 +732,9 @@ primers <- rbind(primers1, primers2)
 primers$Well.col <- as.numeric(substr(primers$Well.position, 2, 3))
 primers$Well.row <- substr(primers$Well.position, 1, 1)
 primers$Marker <- substr(primers$Name, 1, 6)
-primers$Direction <- substr(primers$Name, 7, 7)
+primers$Direction <- substr(primers$Name, 7, 7) #F or R
 
-primers$Sper_seq <- NULL
+primers$Sper_seq <- NULL #Primer Sper01 sequence
 primers[primers$Marker == "SPER01" & primers$Direction == "F",
         "Sper_seq"] <- "GGGCAATCCTGAGCCAA"
 primers[primers$Marker == "SPER01" & primers$Direction == "R",
