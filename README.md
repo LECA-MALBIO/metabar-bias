@@ -4,9 +4,11 @@ This project contains the data and analysis scripts linked to the paper:
 
 ***Towards quantitative DNA Metabarcoding: A method to overcome PCR amplification bias***
 
-by Moinard et al.
+05/10/23: The paper is available as a preprint. Cite as:
 
-03/10/23: The paper is available as a preprint on: ***
+*Towards quantitative DNA Metabarcoding: A method to overcome PCR amplification bias
+Sylvain Moinard, Didier Piau, Frederic Laporte, Delphine Rioux, Pierre Taberlet, Eric Coissac, Christelle Gonindard-Melodelima
+bioRxiv 2023.10.03.560640; doi: https://doi.org/10.1101/2023.10.03.560640*
 
 All raw data files are processed with the scripts in data_processing.Rmd.
 
