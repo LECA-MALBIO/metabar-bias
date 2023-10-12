@@ -1,4 +1,4 @@
-# metabar-bias
+# Readme : metabar-bias project
 
 This project contains the data and analysis scripts linked to the paper:
 
@@ -14,3 +14,5 @@ All raw data files are processed with the scripts in data_processing.Rmd.
 
 Analyses are done in the scripts in metabar_bias.Rmd and with the Julia scripts inference_metabarcoding.jl and inference_pcr_efficiency.jl
 (explained in metabar_bias.Rmd).
+
+The Taqman probes are designed in Taqman_design.Rmd.

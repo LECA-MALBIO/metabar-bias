@@ -1,0 +1,215 @@
+
+---
+title: 'Towards quantitative DNA Metabarcoding: A method to overcome PCR amplification bias - Taqman probes design'
+author:
+  - name: Sylvain Moinard
+    institute: leca
+    email: sylvain.moinard@univ-grenoble-alpes.fr
+    correspondence: true
+  - name: Didier Piau
+    institute: ijf
+  - name: Frédéric Laporte
+    institute: leca
+  - name: Delphine Rioux
+    institute: leca
+  - name: Pierre Taberlet
+    institute: leca
+  - name: Christelle Gonindard-Melodelima
+    institute: leca
+  - name: Eric Coissac
+    institute: leca
+    email: eric.coissac@metabarcoding.org 
+    correspondence: true
+institute:
+  - leca: Univ. Grenoble-Alpes, Univ. Savoie Mont Blanc, CNRS, LECA, 38000, Grenoble, France.
+  - ijf: Univ. Grenoble-Alpes, CNRS, Institut Joseph Fourier, 38000, Grenoble, France.
+output:
+  html_document
+---
+
+
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(purrr)
+library(readxl)
+library(stringr)
+```
+
+## Taqman probe design
+
+This file summarises the steps to design the probes used in the analysis of the paper.
+
+Last edit: 12/10/2023
+
+## probes design
+
+Criteria :
+
+- Length from 15 to 30
+- First G as far as possible in the complementary sequence
+- Minimal number of G in the complementary sequence
+- Difference between Tm_sa(probe) and Tm_sa(primer) (min(F, R)) : about 10°C
+- GC content
+- Longest homopolymer
+- No annealing with non-target sequence
+
+Melting temperature (salt adjusted) : Oligo Calc
+http://biotools.nubic.northwestern.edu/OligoCalc.html
+
+```{r functions}
+#Position of first G in the probe, starting at position i 
+firstG <- function(i, sequence){
+  indexG <- str_locate_all(pattern = "c", tolower(sequence))[[1]][,1] #complementary strand
+  indexG[which(indexG >= i)[1]]-i+1
+}
+
+len_min <- 15
+len_max <- 30
+
+Tm_sa <- function(sequence){
+  # TM salt adjusted of the probe
+  # Treat R, Y, etc as AT
+  Na <- 50e-3
+  seql <- tolower(sequence)
+  100.5 + (41 * (str_count(seql, "g")+str_count(seql, "c"))/nchar(seql)) - (820/nchar(seql)) + 16.6*log10(Na)
+}
+
+eval_taqman <- function(sequence, primer = "GGGCAATCCTGAGCCAA"){
+  # Evaluate a candidate probe
+  # Default primer: Forward Sper01
+  res <- sequence
+  attr(res, "length") <- nchar(sequence)
+  attr(res, "Tm_sa") <- Tm_sa(sequence)
+  attr(res, "diffTmsa") <- Tm_sa(sequence) - Tm_sa(primer) #Sper01
+  fg <- firstG(1, sequence)
+  names(fg) <- NULL
+  attr(res, "first_G") <- fg
+  attr(res, "number_G") <- str_count(tolower(sequence), "c") #complementary
+  attr(res, "GC_content") <- (str_count(tolower(sequence), "g")+
+                      str_count(tolower(sequence), "c"))/
+    nchar(sequence)
+  attr(res, "sequence_probe") <- chartr("atgc","tacg",sequence)
+  attr(res, "longest_homop") <- nchar(str_extract_all(sequence, "(.)\\1+")%>%
+                                        map_chr(~.x[which.max(nchar(.x))]))
+  res
+}
+```
+
+## Open barcode data Sper01
+
+```{r data}
+barcodes <- read_excel("data/new_plant_positive_control.xlsx")[,c(2,4:6)]
+names(barcodes) <- c("species_name", "sequence", "length", "gc_content")
+
+barcodes[barcodes$species_name == "Salvia_pratensis",]$sequence <- "atcctgttttctcaaaacaaaggttcaaaaaacgaaaaaaaaaaag"
+
+barcodes <- barcodes %>%
+  filter(!species_name %in%
+           c("Taxus_baccata", "Rumex_acetosa", "Picea_abies"))
+#Species not used in this experiment
+```
+
+## Sper01 primers info
+
+Sper01 : Tm_sa = 54.8°C (F) et 62.1°C (R)
+So Tm_sa of probe: around 64°C
+
+```{r sper01}
+#Sper01 F : GGGCAATCCTGAGCCAA
+#Sper01 R : GAGCCAAGAGTCTCTGCACCTATC
+
+Tm_sa("GGGCAATCCTGAGCCAA")
+Tm_sa("CCATTGAGTCTCTGCACCTATC")
+```
+
+## Design
+
+Carpinus betulus: long barcode ; two probes
+Capsella_bursa-pastoris : higher GC content
+Fraxinus excelsior: short barcode
+
+
+```{r test probes}
+taqman_export <- NULL
+barcodes$compl <- chartr("atgc","tacg",barcodes$sequence)
+```
+
+### Carpinus_betulus
+
+```{r test probes Cbe}
+i_Cbe <- which(barcodes$species_name == "Carpinus_betulus")
+nchar(barcodes[i_Cbe,]$sequence)
+barcodes[i_Cbe,]$compl
+
+str_locate_all(pattern = "g", barcodes[i_Cbe,]$sequence)[[1]][,1]
+
+#Position of first G according to starting base
+G1 <- sapply(1:nchar(barcodes[i_Cbe,]$compl),
+             function(x) firstG(x, barcodes[i_Cbe,]$compl))
+which.max(G1)
+
+complemCbeA <- substr(barcodes[i_Cbe,]$compl, 1, 30)
+
+taqman_CbeA <- eval_taqman(complemCbeA)
+attr(taqman_CbeA, "Start_position") <- 1
+attr(taqman_CbeA, "End_position") <- 30
+taqman_CbeA
+
+complemCbeA <- substr(barcodes[i_Cbe,]$compl, 32, 61)
+
+taqman_CbeB <- eval_taqman(complemCbeA)
+attr(taqman_CbeB, "Start_position") <- 32
+attr(taqman_CbeB, "End_position") <- 61
+taqman_CbeB
+```
+
+### Capsella_bursa-pastoris
+
+```{r test probes Cbp}
+i_Cbp <- which(barcodes$species_name == "Capsella_bursa-pastoris")
+nchar(barcodes[i_Cbp,]$sequence)
+barcodes[i_Cbp,]$compl
+
+str_locate_all(pattern = "g", barcodes[i_Cbp,]$sequence)[[1]][,1]
+
+#Position of first G according to starting base
+G1 <- sapply(1:nchar(barcodes[i_Cbp,]$compl),
+             function(x) firstG(x, barcodes[i_Cbp,]$compl))
+which.max(G1)
+
+complemCbp <- substr(barcodes[i_Cbp,]$compl, which.max(G1)[1],
+                    which.max(G1)[1]+24)
+
+taqman_Cbp <- eval_taqman(complemCbp)
+attr(taqman_Cbp, "Start_position") <- which.max(G1)[1]
+attr(taqman_Cbp, "End_position") <- which.max(G1)[1]+24
+taqman_Cbp
+```
+
+###Fraxinus_excelsior
+
+```{r test probes Fex}
+i_Fex <- which(barcodes$species_name == "Fraxinus_excelsior")
+nchar(barcodes[i_Fex,]$sequence)
+barcodes[i_Fex,]$compl
+
+str_locate_all(pattern = "g", barcodes[i_Fex,]$sequence)[[1]][,1]
+
+#Position of first G according to starting base
+G1 <- sapply(1:nchar(barcodes[i_Fex,]$compl),
+             function(x) firstG(x, barcodes[i_Fex,]$compl))
+which.max(G1)
+
+complemFex <- substr(barcodes[i_Fex,]$compl, which.max(G1)[1],
+                    which.max(G1)[1]+29)
+
+taqman_Fex <- eval_taqman(complemFex)
+attr(taqman_Fex, "Start_position") <- which.max(G1)[1]
+attr(taqman_Fex, "End_position") <- which.max(G1)[1]+29
+taqman_Fex
+```
+
