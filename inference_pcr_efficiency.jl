@@ -21,7 +21,7 @@ qty_init_U = fill(19084., size(reads_U, 2))
 #Normally approximated simulation:
 function simu_pcr_normalQ_eff(Theta,
     quantiles ;
-    m0 = qty_init,
+    m0 = fill(2e4, length(Theta)),
     K = 1e11,
     n_reads = 1e5,
     ncycles = 40,
@@ -32,6 +32,14 @@ function simu_pcr_normalQ_eff(Theta,
     e = 1.)
 
     Lambda = Theta
+
+    if length(n_reads) == 1
+      n_reads = fill(1e5, nreplicate)
+    end
+
+    if length(n_reads) < nreplicate
+      n_reads = vec(repeat(n_reads, Int64(nreplicate/length(n_reads)))) #multiple needed
+    end
 
     nspecies = length(m0) #Number of species
     kinetics = Array{eltype(Theta),2}(undef, nreplicate, nspecies) #initialize kinetics
@@ -76,16 +84,17 @@ function simu_pcr_normalQ_eff(Theta,
   end
 
   #Sequencing
+  kinetics_tot = sum(kinetics, dims = 2)
   for species in 1:nspecies
     #reuse crea array for pre-allocation
-    crea[:] .= sqrt.(view(kinetics,:, species) ./ sum(kinetics, dims = 2) .*
-                 n_reads .* (one(eltype(kinetics)) .- view(kinetics,:, species) ./ sum(kinetics, dims = 2)))
-    kinetics[:,species] .= quantile.(Normal.(n_reads .* view(kinetics,:,species) ./ sum(kinetics, dims = 2), crea),
-                                view(quantiles,1:nreplicate,(nspecies*(ncycles+1)+species)))
+    crea[:] .= vec(view(kinetics,:, species) ./ kinetics_tot)
+    kinetics[:,species] .= quantile.(Normal.(n_reads .* crea,
+                                             sqrt.(n_reads .* crea .* (one(eltype(crea)) .- crea))),
+                                    view(quantiles,1:nreplicate,(nspecies*(ncycles+1)+species)))
   end
   kinetics[kinetics .< zero(eltype(m0))] .= zero(eltype(m0))
   
-  return kinetics
+  return kinetics .* n_reads ./ sum(kinetics, dims = 2)
 end
 
 
@@ -94,41 +103,44 @@ function J_efficiencies(Theta,
     reads_data = rand(1,1)::Array{Float64, 2},
     m0 = qty_init_U,
     K = 1e11,
-    n_reads = 1e5
+    n_reads = 1e5,
     ncycles = 40,
     dispersion = 1.,
     model = "logistic",
     c = 1.,
     e = 1.,
-    lambda_max = 0.9)
+    lambda_max = 1.)
 
     #One should choose nsim = k * nreplicate, k integer
 
-  Theta = vcat(lambda_max, Theta) #most abundant species in first position !!!
+  Theta = vcat(lambda_max, vec(Theta)) #most abundant species in first position !!!
+  println(Theta)
 
   nsim = size(quantiles, 1) #number of simulations to perform by flimo
 
   nreplicate = size(reads_data, 1)
 
-  Ksim = Vector{eltype(Theta)}(undef, nsim) #estimated value of K for each simulation
+  #Ksim = Vector{eltype(Theta)}(undef, nsim) #estimated value of K for each simulation
   pdata = vec(mean(reads_data ./ sum(reads_data, dims = 2), dims = 1)) #average species proportions in data
   #pdata = vec(mean(reads_data, dims = 1))
 
   nsimr = Int64(floor(nsim/nreplicate)) #number of simulations by replicate
 
+  n_reads_repli = Vector{eltype(m0)}(undef, nsim) #Number of reads for each simulation
+  
   @inbounds for repl in 1:nreplicate
       #more simulations than replicates needed in this implementation
-      Ksim[(1+(repl-1)*nsimr):(repl*nsimr)] .= K[repl]
+      n_reads_repli[(1+(repl-1)*nsimr):(repl*nsimr)] .= n_reads[repl]
     end
-    if Int64(floor(nsim/nreplicate))*nreplicate < nsim #unused in the score computation
-      Ksim[(1+Int64(floor(nsim/nreplicate))*nreplicate):nsim] .= view(K,1:nsim-Int64(floor(nsim/nreplicate))*nreplicate)
+    if nsimr*nreplicate < nsim #unused in the score computation
+      n_reads_repli[(1+nsimr*nreplicate):nsim] .= view(n_reads,1:nsim-nsimr*nreplicate)
     end
 
     kinetics = simu_pcr_normalQ_eff(Theta,
                                    quantiles ;
                                    m0 = m0,
-                                   K = Ksim,
-                                   n_reads = n_reads,
+                                   K = K,
+                                   n_reads = n_reads_repli,
                                    ncycles = ncycles,
                                    nreplicate = nsim,
                                    dispersion = dispersion,
@@ -149,6 +161,9 @@ function J_efficiencies(Theta,
       
       psimu = vec(mean(kinetics, dims = 1))
       psimu[:] .= psimu ./ sum(psimu)
+
+      println(pdata)
+      println(psimu)
       
       score = sum(((psimu .- pdata).^2. ./ pdata))
 
@@ -236,7 +251,6 @@ nsim = 1900
 optU_eff = optim_efficiencies(reads_U, qty_init_U,
   ncycles = 40,
   K = K,
-  n_reads = n_reads,
   dispersion = 1.,
   nsim = nsim)
 
@@ -250,8 +264,8 @@ res_lambda = vcat(1, vec(optU_eff.minimizer))
 simU = simu_pcr_normalQ_eff(vcat(0.9, vec(optU_eff.minimizer)),
     rand(190, 13*62),
     m0 = qty_init_U,
-    K = vec(repeat(Ksample, 10)),
-    n_reads = sum(reads_U, dims = 2),
+    K = K,
+    n_reads = vec(repeat(sum(reads_U, dims = 2), 10)),
     ncycles = 40)
 
 mean(simU, dims = 1) ./ sum(mean(simU, dims = 1))
@@ -313,12 +327,18 @@ CSV.write("data/prop_inferG.csv", Tables.table(optG_full.minimizer ./ sum(optG_f
 ## Tests
 ##____________________________________________________________________________________________________
 
-#Random.seed!(1234)
-J_efficiencies(optU_eff.minimizer , rand(190, 13*42), reads_data = reads_U, K = K, n_reads = sum(reads_U, dims = 2))
+Random.seed!(1234)
+Q = rand(190, 13*42)
 
-J_efficiencies(optU_eff.minimizer .* 1.2, rand(190, 13*42), reads_data = reads_U, K = K, n_reads = sum(reads_U, dims = 2))
+J_efficiencies(optU_eff.minimizer, Q, reads_data = reads_U, K = K, n_reads = sum(reads_U, dims = 2))
+J_efficiencies(fill(0.825, 12) , Q, reads_data = reads_U, K = K, n_reads = sum(reads_U, dims = 2))
 
-J_efficiencies(fill(0.8, 13) , rand(190, 13*42), reads_data = reads_U, K = K, n_reads = sum(reads_U, dims = 2))
+a = simu_pcr_normalQ_eff(Lambda_infer, Q, K = K, n_reads = sum(reads_U, dims = 2))
+b = simu_pcr_normalQ_eff(fill(0.825, 13), Q, K = K, n_reads = sum(reads_U, dims = 2))
+
+mean(reads_U ./ sum(reads_U, dims = 2), dims = 1)
+mean(a ./ sum(a, dims = 2), dims = 1)
+mean(b ./ sum(b, dims = 2), dims = 1)
 
 #J_Qmetabar([1., 1., 1.], rand(190, 1000), reads_data = reads_dataU, Lambda = Lambda, ncycles = 40)
 

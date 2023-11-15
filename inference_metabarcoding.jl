@@ -139,6 +139,14 @@ function simu_pcrQ(Theta,
                    c = 1.,
                    e = 1.)
 
+                   if length(n_reads) == 1
+                    n_reads = fill(1e5, nreplicate)
+                  end
+              
+                  if length(n_reads) < nreplicate
+                    n_reads = vec(repeat(n_reads, Int64(nreplicate/length(n_reads)))) #multiple needed
+                  end
+
   #Average initial number of molecules of each species:
   m0 = Theta
   nspecies = length(m0) #Number of species
@@ -213,6 +221,10 @@ function simu_pcr_normalQ(Theta,
       n_reads = fill(1e5, nreplicate)
     end
 
+    if length(n_reads) < nreplicate
+      n_reads = vec(repeat(n_reads, Int64(nreplicate/length(n_reads)))) #multiple needed
+    end
+
     #Average initial number of molecules of each species:
     m0 = Theta
     nspecies = length(m0) #Number of species
@@ -261,7 +273,7 @@ function simu_pcr_normalQ(Theta,
   kinetics_tot = sum(kinetics, dims = 2)
 
   for species in 1:nspecies
-    #reuse crea array for pre-allocation for std
+    #reuse crea array for pre-allocation
     crea[:] .= vec(view(kinetics,:, species) ./ kinetics_tot)
     kinetics[:,species] .= quantile.(Normal.(n_reads .* crea,
                                              sqrt.(n_reads .* crea .* (one(eltype(crea)) .- crea))),
