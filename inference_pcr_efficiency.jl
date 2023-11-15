@@ -23,7 +23,7 @@ function simu_pcr_normalQ_eff(Theta,
     quantiles ;
     m0 = qty_init,
     K = 1e11,
-    seq_rate = 1e4/ mean(K),
+    n_reads = 1e5,
     ncycles = 40,
     nreplicate = size(quantiles, 1),
     dispersion = 1.,
@@ -78,9 +78,9 @@ function simu_pcr_normalQ_eff(Theta,
   #Sequencing
   for species in 1:nspecies
     #reuse crea array for pre-allocation
-    crea[:] .= sqrt.(view(kinetics,:, species) .*
-                 seq_rate .* (one(eltype(kinetics)) .- view(kinetics,:, species) ./ K))
-    kinetics[:,species] .= quantile.(Normal.(seq_rate .* view(kinetics,:,species), crea),
+    crea[:] .= sqrt.(view(kinetics,:, species) ./ sum(kinetics, dims = 2) .*
+                 n_reads .* (one(eltype(kinetics)) .- view(kinetics,:, species) ./ sum(kinetics, dims = 2)))
+    kinetics[:,species] .= quantile.(Normal.(n_reads .* view(kinetics,:,species) ./ sum(kinetics, dims = 2), crea),
                                 view(quantiles,1:nreplicate,(nspecies*(ncycles+1)+species)))
   end
   kinetics[kinetics .< zero(eltype(m0))] .= zero(eltype(m0))
@@ -94,7 +94,7 @@ function J_efficiencies(Theta,
     reads_data = rand(1,1)::Array{Float64, 2},
     m0 = qty_init_U,
     K = 1e11,
-    seq_rate = 1e-7,
+    n_reads = 1e5
     ncycles = 40,
     dispersion = 1.,
     model = "logistic",
@@ -128,7 +128,7 @@ function J_efficiencies(Theta,
                                    quantiles ;
                                    m0 = m0,
                                    K = Ksim,
-                                   seq_rate = seq_rate,
+                                   n_reads = n_reads,
                                    ncycles = ncycles,
                                    nreplicate = nsim,
                                    dispersion = dispersion,
@@ -183,9 +183,7 @@ function optim_efficiencies(reads_data::Array{Float64, 2}, m0::Array{Float64, 1}
     nspecies = size(reads_data, 2)
   
     #Estimation of K for the data replicates
-    Ksample = sum(reads_data, dims = 2) #intermediate value = sum reads
-    seq_rate = mean(Ksample)/K
-    Ksample[:] .= vec(Ksample ./ seq_rate)
+    n_reads_repli = sum(reads_data, dims = 2)
   
     #pdata = vec(mean(reads_data ./ sum(reads_data, dims = 2), dims = 1)) #average species proportions in data
     if (isnothing(Theta0))
@@ -194,8 +192,8 @@ function optim_efficiencies(reads_data::Array{Float64, 2}, m0::Array{Float64, 1}
     obj = (Theta, quantiles) -> J_efficiencies(Theta, quantiles,
                                           reads_data = reads_data,
                                           m0 = m0,
-                                          K = Ksample,
-                                          seq_rate = seq_rate,
+                                          K = K,
+                                          n_reads = n_reads_repli,
                                           ncycles = ncycles,
                                           dispersion = dispersion,
                                           model = model,
@@ -229,13 +227,7 @@ K = 7.57e12
 
 nreplicate = size(reads_U, 1)
 
-Ksample = sum(reads_U, dims = 2)
-seq_rate = mean(Ksample)/K
-Ksample[:] .= vec(Ksample ./ seq_rate)
-
-@inbounds for repl in 1:nreplicate
-  Ksample[repl] = Ksample[repl] / seq_rate
-end
+n_reads = sum(reads_U, dims = 2)
 
 ## Optimize
 #nsim proportional to nreplicates
@@ -244,6 +236,7 @@ nsim = 1900
 optU_eff = optim_efficiencies(reads_U, qty_init_U,
   ncycles = 40,
   K = K,
+  n_reads = n_reads,
   dispersion = 1.,
   nsim = nsim)
 
@@ -258,7 +251,7 @@ simU = simu_pcr_normalQ_eff(vcat(0.9, vec(optU_eff.minimizer)),
     rand(190, 13*62),
     m0 = qty_init_U,
     K = vec(repeat(Ksample, 10)),
-    seq_rate = mean(sum(reads_U, dims = 2)) / K,
+    n_reads = sum(reads_U, dims = 2),
     ncycles = 40)
 
 mean(simU, dims = 1) ./ sum(mean(simU, dims = 1))
@@ -321,11 +314,11 @@ CSV.write("data/prop_inferG.csv", Tables.table(optG_full.minimizer ./ sum(optG_f
 ##____________________________________________________________________________________________________
 
 #Random.seed!(1234)
-J_efficiencies(optU_eff.minimizer , rand(190, 13*42), reads_data = reads_U, K = Ksample, seq_rate = mean(sum(reads_U, dims = 2)) / K)
+J_efficiencies(optU_eff.minimizer , rand(190, 13*42), reads_data = reads_U, K = K, n_reads = sum(reads_U, dims = 2))
 
-J_efficiencies(optU_eff.minimizer .* 1.2, rand(190, 13*42), reads_data = reads_U, K = K, seq_rate = mean(sum(reads_U, dims = 2)) / K)
+J_efficiencies(optU_eff.minimizer .* 1.2, rand(190, 13*42), reads_data = reads_U, K = K, n_reads = sum(reads_U, dims = 2))
 
-J_efficiencies(fill(0.8, 13) , rand(190, 13*42), reads_data = reads_U, seq_rate = mean(sum(reads_U, dims = 2)) / K)
+J_efficiencies(fill(0.8, 13) , rand(190, 13*42), reads_data = reads_U, K = K, n_reads = sum(reads_U, dims = 2))
 
 #J_Qmetabar([1., 1., 1.], rand(190, 1000), reads_data = reads_dataU, Lambda = Lambda, ncycles = 40)
 

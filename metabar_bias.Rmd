@@ -1,6 +1,6 @@
 
 ---
-title: 'Towards quantitative DNA Metabarcoding: A method to overcome PCR amplification bias - scripts'
+title: 'Towards quantitative DNA Metabarcoding: A method to overcome PCR amplification bias - data processing'
 author:
   - name: Sylvain Moinard
     institute: leca
@@ -25,7 +25,7 @@ institute:
   - ijf: Univ. Grenoble-Alpes, CNRS, Institut Joseph Fourier, 38000, Grenoble, France.
 output:
   html_document:
-    toc:true
+    toc: true
     theme: united
 ---
 
@@ -55,7 +55,7 @@ library(qpcR)
 This script is used to produce the analyses of the paper.
 Our data is processed in the data_processing.Rmd file.
 
-Last edit: 03/10/2023
+Last edit: 14/11/2023
 
 ## ddPCR analysis
 
@@ -105,7 +105,8 @@ CDNA_U <- 0.5
 C_species_ref <- CDNA_U/13 #concentration of each species, ng/ul
 
 summary_experiment <- summary_experiment %>%
-  mutate(cDNA_U = C_species_ref*Volume_equi,
+  mutate(Volume_equi = max(Molecules_ng)/Molecules_ng,
+         cDNA_U = C_species_ref*Volume_equi,
          #Concentration of total DNA to use in the U commu
          molecules_U = cDNA_U*Molecules_ng, #Molecules/ul in sample
          propU = molecules_U/sum(molecules_U), #species proportion
@@ -144,7 +145,8 @@ Number of molecules in the G community
 
 ```{r commu G}
 summary_experiment <- summary_experiment %>%
-  mutate(cDNA_G = CDNA_T/2^RankG*Volume_equi,
+  mutate(Volume_equi = max(Molecules_ng)/Molecules_ng,
+         cDNA_G = CDNA_U/2^RankG*Volume_equi,
          molecules_G = cDNA_G*Molecules_ng,
          propG = molecules_G/sum(molecules_G))
 
@@ -218,7 +220,7 @@ fcrit_exp <- function(par,
 opt_exp <- optim(c(5.75, 0.55),
                    fcrit_exp,
                    data = ampli,
-                   low_cycle= low_cycle,
+                   low_cycle= 15,
                    high_cycle = 24,
                    lower = c(1, 0.4),
                    upper = c(10, 0.9),
@@ -332,10 +334,10 @@ Figure:
 ```{r saturation models - figure}
 ggplot()+
         geom_point(data = ampli, aes(Cycle-1, molecules))+
-        geom_line(data = NULL, aes((0:60), res_log,
+        geom_line(data = NULL, aes(0:60, res_log,
                                    col = "Logistic"),
                   linewidth = 0.75)+
-        geom_line(aes(0:(60-1), modele_exp[-1],
+        geom_line(aes(0:60, model_exp[-1],
                       col = "Exponential"),
                   linewidth = 0.75)+
         # geom_line(aes(0:(60-1), pmec[-1,1],
@@ -716,7 +718,9 @@ df_targetG$species_name <- factor(df_targetG$species_name,
 
 ```
 
-Inference results: prop_infer_mock = Proportions inferred by the ratio corection established from the U community
+Inference results:
+
+prop_infer_mock = Proportions inferred by the ratio corection established from the U community
 
 ```{r inference results}
 resU1 <- df_targetU %>% group_by(species_name) %>%
@@ -964,19 +968,19 @@ Inference with the flimo method
 
 ```{r efficiencies U Julia}
 #Inferred efficiencies
-efficiencies <- t(read_csv("data/efficiencies_U.csv"))
-colnames(efficiencies) <- colnames(readsU)
+efficiencies_infer <- t(read_csv("data/efficiencies_U.csv"))
+colnames(efficiencies_infer) <- colnames(readsU)
 
 summary_experiment <- summary_experiment %>%
-  left_join(efficiencies %>%
+  left_join(efficiencies_infer %>%
               as_tibble() %>%
               pivot_longer(1:13, names_to = "species_name",
                            values_to = "efficiencies"))
 ```
+
 #### Table 2
 
-```{r}
-
+```{r table2}
 resU1 %>% dplyr::select(species_name, prop_expected, prop)
 
 #Efficiencies by Taqman
@@ -1013,8 +1017,6 @@ resG1 <- resG1 %>%
                                     values_to = "prop_infer_Lambda")) %>%
   arrange(-dplyr::row_number())
 ```
-
-
 
 ### Table 3
 

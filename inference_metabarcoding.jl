@@ -13,6 +13,8 @@
 #See https://git.metabarcoding.org/lecasofts/flimo
 
 
+#TO DO 14/11/2023 : implement quantile multinomial (with cumsum)
+
 ##____________________________________________________________________________________________________
 ## Setup
 
@@ -50,7 +52,7 @@ end
 #
 # Lambda is an array containing the amplification rates of each species (0 <= Lambda <= 1)
 # K is the charge capacity
-# seq_rate is the fraction of molecules that are sequenced
+# n_reads is the number of reads after sequencing
 # ncycles is the number of PCR cycles
 # nreplicate is the number of replicates to simulate
 # dispersion is the initial inter-replicate dispersion
@@ -59,11 +61,77 @@ end
 #quantiles: 2D array. Nrow = Number of simulations; Ncol = nspecies*(ncycles+2)
 
 #Exact simulation:
+function simu_pcr(Theta ;
+  Lambda = fill(one(eltype(Theta)), length(Theta)),
+  K = 1e11,
+  n_reads = 1e5,
+  ncycles = 40,
+  nreplicate = 1,
+  dispersion = 1.,
+  model = "logistic",
+  c = 1.,
+  e = 1.)
+
+#Average initial number of molecules of each species:
+  m0 = Theta
+  nspecies = length(m0) #Number of species
+  kinetics = Array{Int64,2}(undef, nreplicate, nspecies) #initialize kinetics
+  lam = Vector{Float64}(undef, nreplicate) #effective amplification rates
+  crea = Vector{Int64}(undef, nreplicate) #new molecules create at each cycle for one species
+  crea_tot = Vector{Int64}(undef, nreplicate) #total number of molecules created at each cycle
+  kin_tot = zeros(eltype(kinetics), nreplicate) #total number of molecules created
+
+#Initialisation
+  @inbounds for species in 1:nspecies
+    if dispersion <= 1.
+      kinetics[:,species] .= rand.(Poisson(m0[species]))
+    else
+      if m0[species] == zero(eltype(m0))
+        kinetics[:,species] .= zero(eltype(m0))
+      else
+        kinetics[:,species] .= rand.(NegativeBinomial(m0[species]/(dispersion^2-1),1/dispersion^2))
+      end
+    end
+  end
+
+#Amplification cycle by cycle
+  @inbounds for cyc in 1:ncycles #for each cycle
+    crea_tot[:] .= zero(eltype(m0))
+    @inbounds for species in 1:nspecies #for each species
+#effective rate
+      if model == "logistic"
+#Logistic model
+        lam[:] .= Lambda[species].*(one(eltype(lam)) .- kin_tot ./ K)
+      else
+#mechanistic model
+        lam[:] .= Lambda[species].* (one(eltype(lam)) .- kin_tot ./ K) .* c .* gamma_factor.(kin_tot ./ K, c = c) .* (e .- kin_tot ./ K)
+        lam[lam .>= one(eltype(lam))] .= one(eltype(lam)) #happens if e.c > 1
+      end
+      lam[lam .<= zero(eltype(lam))] .= zero(eltype(lam))
+#Amplification
+      crea[:] .= rand.(Binomial.(view(kinetics,:,species), lam))
+      broadcast!(+, crea_tot, crea_tot, crea) #update molecules created at this cycle
+      kinetics[:,species] .= view(kinetics, :, species).+crea
+    end
+    broadcast!(+, kin_tot, kin_tot, crea_tot) #update molecules created
+  end
+
+#Sequencing
+  if length(n_reads) == 1
+    n_reads = fill(n_reads, nreplicate)
+  end
+  for i in 1:nreplicate
+    kinetics[i,:] .= vec(rand(Multinomial(Int64(n_reads[i]), vec(kinetics ./ sum(kinetics)))))
+  end
+
+  return kinetics
+end
+
 function simu_pcrQ(Theta,
                    quantiles ;
                    Lambda = fill(one(eltype(Theta)), length(Theta)),
                    K = 1e11,
-                   seq_rate = 1e4/ mean(K),
+                   n_reads = 1e5,
                    ncycles = 40,
                    nreplicate = size(quantiles, 1),
                    dispersion = 1.,
@@ -117,10 +185,10 @@ function simu_pcrQ(Theta,
     broadcast!(+, kin_tot, kin_tot, crea_tot) #update molecules created
   end
 
-  #Sequencing
+  #Sequencing -> no quantile function available for multinomial
   for species in 1:nspecies
-    kinetics[:,species] .= quantile.(Binomial.(Int64.(floor.(seq_rate .* K)),
-                                      view(kinetics,:,species) ./ K),
+    kinetics[:,species] .= quantile.(Binomial.(Int64.(n_reads),
+                                      view(kinetics,:,species) ./ sum(kinetics, dims = 2)),
     view(quantiles,1:nreplicate,(nspecies*(ncycles+1)+species)))
   end
   return kinetics
@@ -133,13 +201,17 @@ function simu_pcr_normalQ(Theta,
     quantiles ;
     Lambda = fill(one(eltype(Theta)), length(Theta)),
     K = 1e11,
-    seq_rate = 1e4/ mean(K),
-    ncycles = 40,
     nreplicate = size(quantiles, 1),
+    n_reads = 1e5,
+    ncycles = 40,
     dispersion = 1.,
     model = "logistic",
     c = 1.,
     e = 1.)
+
+    if length(n_reads) == 1
+      n_reads = fill(1e5, nreplicate)
+    end
 
     #Average initial number of molecules of each species:
     m0 = Theta
@@ -149,6 +221,7 @@ function simu_pcr_normalQ(Theta,
     crea = Vector{eltype(Theta)}(undef, nreplicate) #new molecules create at each cycle for one species
     crea_tot = Vector{eltype(Theta)}(undef, nreplicate) #total number of molecules created at each cycle
     kin_tot = zeros(eltype(Theta), nreplicate) #total number of molecules created
+
     #Initialisation
     @inbounds for species in 1:nspecies
         kinetics[:,species] .= quantile.(Normal(m0[species],
@@ -159,7 +232,6 @@ function simu_pcr_normalQ(Theta,
     #Amplification cycle by cycle
     @inbounds for cyc in 1:ncycles #for each cycle
       #if (mean(kin_tot) >= mean(K)/10) & pc
-      #  println(c)
       #  pc = false
       #end
       crea_tot[:] .= zero(eltype(m0))
@@ -185,17 +257,20 @@ function simu_pcr_normalQ(Theta,
       broadcast!(+, kin_tot, kin_tot, crea_tot) #update molecules created
     end
 
-  #Sequencing
+  #Sequencing -> simulate marginal distributions
+  kinetics_tot = sum(kinetics, dims = 2)
+
   for species in 1:nspecies
-    #reuse crea array for pre-allocation
-    crea[:] .= sqrt.(view(kinetics,:, species) .*
-                 seq_rate .* (one(eltype(kinetics)) .- view(kinetics,:, species) ./ K))
-    kinetics[:,species] .= quantile.(Normal.(seq_rate .* view(kinetics,:,species), crea),
-                                view(quantiles,1:nreplicate,(nspecies*(ncycles+1)+species)))
+    #reuse crea array for pre-allocation for std
+    crea[:] .= vec(view(kinetics,:, species) ./ kinetics_tot)
+    kinetics[:,species] .= quantile.(Normal.(n_reads .* crea,
+                                             sqrt.(n_reads .* crea .* (one(eltype(crea)) .- crea))),
+                                    view(quantiles,1:nreplicate,(nspecies*(ncycles+1)+species)))
   end
+
   kinetics[kinetics .< zero(eltype(m0))] .= zero(eltype(m0))
   
-  return kinetics
+  return kinetics .* n_reads ./ sum(kinetics, dims = 2) #***uncorrect conditionning
 end
 
 
@@ -211,7 +286,7 @@ function J_Qmetabar(Theta,
     reads_data = rand(1,1)::Array{Float64, 2},
     Lambda = ones(eltype(Theta), length(Theta)),
     K = 1e11,
-    seq_rate = 1e-7,
+    n_reads = 1e5,
     ncycles = 40,
     dispersion = 1.,
     m0tot = 1e5,
@@ -222,26 +297,32 @@ function J_Qmetabar(Theta,
   nsim = size(quantiles, 1) #number of simulations to perform by flimo
 
   nreplicate = size(reads_data, 1)
+
+  if length(n_reads) == 1
+    n_reads = fill(1e5, nreplicate)
+  end
+
   #nspecies = size(reads_data, 2)
 
   m0 = Theta .* m0tot #initial quantities at right scale
 
-  Ksim = Vector{eltype(m0)}(undef, nsim) #estimated value of K for each simulation
+  n_reads_repli = Vector{eltype(m0)}(undef, nsim) #Number of reads for each simulation
   pdata = vec(mean(reads_data ./ sum(reads_data, dims = 2), dims = 1)) #average species proportions in data
   
   @inbounds for repl in 1:Int64(floor(nsim/nreplicate))
       #more simulations than replicates needed in this implementation
-      Ksim[(1+(repl-1)*nreplicate):(repl*nreplicate)] .= vec(K)
+      n_reads_repli[(1+(repl-1)*nreplicate):(repl*nreplicate)] .= vec(n_reads)
     end
     if Int64(floor(nsim/nreplicate))*nreplicate < nsim
-      Ksim[(1+Int64(floor(nsim/nreplicate))*nreplicate):nsim] .= view(K,1:nsim-Int64(floor(nsim/nreplicate))*nreplicate)
+      n_reads_repli[(1+Int64(floor(nsim/nreplicate))*nreplicate):nsim] .= view(n_reads_repli,1:nsim-Int64(floor(nsim/nreplicate))*nreplicate)
     end
+    Ksim = K
 
     kinetics = simu_pcr_normalQ(m0,
                                    quantiles ;
                                    Lambda = Lambda,
                                    K = Ksim,
-                                   seq_rate = seq_rate,
+                                   n_reads = n_reads_repli,
                                    ncycles = ncycles,
                                    nreplicate = nsim,
                                    dispersion = dispersion,
@@ -288,10 +369,7 @@ function optim_Qmetabar(reads_data::Array{Float64, 2}, Lambda::Array{Float64, 1}
   nreplicate = size(reads_data, 1)
   nspecies = size(reads_data, 2)
 
-  #Estimation of K for the data replicates
-  Ksample = sum(reads_data, dims = 2) #intermediate value = sum reads
-  seq_rate = mean(Ksample)/K
-  Ksample[:] .= vec(Ksample ./ seq_rate)
+  n_reads_repli = sum(reads_data, dims = 2)
 
   pdata = vec(mean(reads_data ./ sum(reads_data, dims = 2), dims = 1)) #average species proportions in data
 
@@ -301,8 +379,8 @@ function optim_Qmetabar(reads_data::Array{Float64, 2}, Lambda::Array{Float64, 1}
   obj = (Theta, quantiles) -> J_Qmetabar(Theta, quantiles,
                                         reads_data = reads_data,
                                         Lambda = Lambda,
-                                        K = Ksample,
-                                        seq_rate = seq_rate,
+                                        K = K,
+                                        n_reads = n_reads_repli,
                                         ncycles = ncycles,
                                         dispersion = dispersion,
                                         m0tot = m0tot,
@@ -328,9 +406,8 @@ function optim_Qmetabar(reads_data::Array{Float64, 2}, Lambda::Array{Float64, 1}
 end
 
 
-function prop_exp(reads_data, Lambda)
-  low_c = 15
-  high_c = 30
+function prop_exp(reads_data, Lambda, low_c = 15, high_c = 30)
+  #proportions with the exponential model for ncycles between low_c and high_c
   prop = zeros(length(low_c:high_c), size(reads_data, 2))
   for s in 1:size(reads_data, 2)
     prop[:,s] = mean(reads_data[:,s]) ./ (1+Lambda[s]) .^(low_c:high_c) .* K ./ mean(sum(reads_data, dims = 2))
@@ -695,8 +772,10 @@ J_Qmetabar([1., 1., 1.], rand(190, 1000), reads_data = reads_dataU, Lambda = Lam
 J_Qmetabar(optU.minimizer, rand(190, 1000), reads_data = reads_dataU, Lambda = Lambda, ncycles = 40)
 
 
-sim = simu_pcr_normalQ(1e5 .* [1., 1., 1.], rand(1, 1000) ; Lambda = Lambda)
+sim = simu_pcr_normalQ(1e5 .* [1., 1., 1.], rand(1, 1000) ; Lambda = Lambda, n_reads = 5e4)
 sim ./ sum(sim)
+
+simu_pcr(1e5 .* [1., 1., 1.], Lambda = Lambda, n_reads = 5e4)
 
 puc = mean(reads_dataU_complete ./ sum(reads_dataU_complete, dims = 2), dims = 1)
 pu = mean(reads_dataU ./ sum(reads_dataU, dims = 2), dims = 1)

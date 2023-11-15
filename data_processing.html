@@ -992,7 +992,6 @@ kinetics &lt;- ampli %&gt;%
 kinetics$Dilu &lt;- match(substr(kinetics$Well, 1, 1), LETTERS)
 kinetics$Repli &lt;- as.integer(substr(kinetics$Well, 2,
                                     nchar(kinetics$Well)))
-
 kinetics$probe &lt;- &quot;Fex&quot;
 kinetics[kinetics$Repli &lt;= 9, &quot;probe&quot;] &lt;- &quot;Cbp&quot; 
 kinetics[kinetics$Repli &lt;= 6, &quot;probe&quot;] &lt;- &quot;CbeB&quot;
