@@ -364,12 +364,46 @@ CSV.write("data/prop_inferG.csv", Tables.table(mean(optG_full.minimizer ./ sum(o
 ##Simulate another MU community
 ##____________________________________________________________________________________________________
 
-simu_pcr(qty_init_U ;
+
+simUm = simu_pcr(qty_init_U ./ 10. ;
   Lambda = Lambda_infer,
   K = K,
   n_reads = 1e5,
   ncycles = 40,
   nreplicate = 10)
+
+simU = simu_pcr(qty_init_U ;
+  Lambda = Lambda_infer,
+  K = K,
+  n_reads = 1e5,
+  ncycles = 40,
+  nreplicate = 10)
+
+  simUp = simu_pcr(qty_init_U .* 10 ;
+  Lambda = Lambda_infer,
+  K = K,
+  n_reads = 1e5,
+  ncycles = 40,
+  nreplicate = 10)
+
+mean(simUm ./ sum(simUm, dims = 2), dims = 1)
+std(simUm ./ sum(simUm, dims = 2), dims = 1)
+
+mean(simU ./ sum(simU, dims = 2), dims = 1)
+std(simU ./ sum(simU, dims = 2), dims = 1)
+
+mean(simUp ./ sum(simUp, dims = 2), dims = 1)
+std(simUp ./ sum(simUp, dims = 2), dims = 1)
+
+
+x = mean(simU ./ sum(simU, dims = 2), dims = 1)
+x[1]/x[13]
+
+x = mean(simUm ./ sum(simUm, dims = 2), dims = 1)
+x[1]/x[13]
+
+x = mean(simUp ./ sum(simUp, dims = 2), dims = 1)
+x[1]/x[13]
 
 ## Tests
 ##____________________________________________________________________________________________________
