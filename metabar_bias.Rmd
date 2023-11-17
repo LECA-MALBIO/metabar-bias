@@ -191,7 +191,7 @@ K <- 7.568463e+12 #Charge capacity, computed below
 #Convert RFU to molecules
 a <- K/(max(ampli$RFU)-min(ampli$RFU))
 b <- -a*min(ampli$RFU)
-ampli$molecules <- a * ampli$RFU + b
+ampli$molecules <- a * ampli$RFU
 
 ampli <- ampli[ampli$Well == "B7",] #B7: species Cbp, sample 26
 
@@ -221,7 +221,7 @@ opt_exp <- optim(c(5.75, 0.55),
                    fcrit_exp,
                    data = ampli,
                    low_cycle= 15,
-                   high_cycle = 24,
+                   high_cycle = 23,
                    lower = c(1, 0.4),
                    upper = c(10, 0.9),
                    method = "L-BFGS-B")
@@ -325,19 +325,22 @@ fitlog <- pcrfit(data_ampli, 1, 2, mlog,
                  weights = weights_log)
 # fitmec <- pcrfit(ampli, 1, 3, mmec, weights = weights)
 
-res_log <- a*fitlog$m$predict(newdata = fitlog$DATA)+b
+res_log <- a*fitlog$m$predict(newdata = fitlog$DATA)
 # res_mec <- a*fitmec$m$predict(newdata = fitmec$DATA)+b
 ```
 
 Figure:
 
 ```{r saturation models - figure}
+
+model_exp2 <- 10^7.75*(1+0.595)^seq(0:ncycles)
+
 ggplot()+
         geom_point(data = ampli, aes(Cycle-1, molecules))+
         geom_line(data = NULL, aes(0:60, res_log,
                                    col = "Logistic"),
                   linewidth = 0.75)+
-        geom_line(aes(0:60, model_exp[-1],
+        geom_line(aes(0:60, model_exp2[-1],
                       col = "Exponential"),
                   linewidth = 0.75)+
         # geom_line(aes(0:(60-1), pmec[-1,1],
@@ -348,8 +351,10 @@ ggplot()+
         theme(legend.justification = c(1, 0),
               legend.position = c(1, 0),
         legend.box.margin=margin(rep(10, 4)))+
-  coord_cartesian(xlim = c(0, 50), ylim = c(0, KWell))+
-  scale_colour_brewer(palette = "Set1")#+
+  scale_colour_brewer(palette = "Set1")+
+    # scale_y_log10()+
+  coord_cartesian(xlim = c(0, 50), ylim = c(1, KWell))
+#+
         # ggtitle(
         #   paste0("Real qPCR data and saturation models - Species : ",
         #                "Capsella bursa-pastoris"))+
@@ -780,8 +785,7 @@ for (s in unique(res_taqman$probe)){
 
 res_taqman$rate <- 10^(-1/res_taqman$slope)-1
 
-res_taqman$Mct <- 10^(log10(1+res_taqman$rate)*
-                         res_taqman$intercept)
+res_taqman$Mct <- 10^(-res_taqman$intercept/res_taqman$slope)
 
 res_taqman %>% group_by(probe) %>%
   summarise(rate = rate[1],
@@ -863,7 +867,8 @@ efficiencies %>% group_by(sp) %>% summarise(Lambda = mean(Lambda))
 
 #lam = Lambdas = efficiencies:
 lam <- efficiencies %>% group_by(sp) %>%
-  summarise(efficiency = mean(Lambda))
+  summarise(efficiency = mean(Lambda),
+            sdeff = sd(Lambda))
 
 res_taqman <- res_taqman %>% left_join(lam)
 
@@ -977,6 +982,18 @@ summary_experiment <- summary_experiment %>%
               pivot_longer(1:13, names_to = "species_name",
                            values_to = "efficiencies"))
 ```
+### C-values, Supp Table 1
+
+```{r 1cvalues}
+summary_experiment$Cvalue <- c(0.46, 0.45, 1.03, 0.84, 0.70, 17.29,
+                               1.02, 6.35, 1.40, 0.40, 1.76, 0.74, 0.87)
+
+summary_experiment <- summary_experiment %>%
+  mutate(copies_genome = Molecules_ng*1e9*Cvalue*1e-12)
+
+summary_experiment
+```
+
 
 #### Table 2
 
@@ -987,8 +1004,10 @@ resU1 %>% dplyr::select(species_name, prop_expected, prop)
 lam
 #Normalized efficiencies
 efficiencies %>% group_by(probe) %>%
-    summarise(efficiency = mean(Lambda)) %>%
-  mutate(efficiency = efficiency/lam$efficiency[3]*0.924)
+    summarise(efficiency = mean(Lambda),
+              sdeff = sd(Lambda)) %>%
+  mutate(efficiency = efficiency/lam$efficiency[3]*0.920,
+         sdeff = sdeff/lam$efficiency[3]*0.920)
 
 summary_experiment %>% arrange(RankG) %>%
   dplyr::select(species_name, efficiencies)
@@ -1026,6 +1045,71 @@ resG1 <- resG1 %>%
 resT1
 resG1
 ```
+
+#### Proportions with exponential model
+
+Computation of neff for M_U
+
+```{r}
+
+summary_experiment <- summary_experiment %>%
+  left_join(resU1 %>% dplyr::select(species_name, prop) %>%
+                  rename(prop_obsU = prop)) %>%
+  left_join(resT1 %>% dplyr::select(species_name, prop) %>%
+              rename(prop_obsT = prop)) %>%
+  left_join(resG1 %>% dplyr::select(species_name, prop) %>%
+              rename(prop_obsG = prop))
+
+K <- 2.455e12
+mg_lam_s_p1 <- exp(mean(log(summary_experiment$efficiencies+1)))
+
+mg_psU <- exp(mean(log(summary_experiment$prop_obsU)))
+mg_m0sU <- exp(mean(log(VDNA_metab*summary_experiment$molecules_U))) #molecules/ug
+neffU <- (log(mg_psU)+log(K)-log(mg_m0sU))/log(mg_lam_s_p1)
+
+mg_psT <- exp(mean(log(summary_experiment$prop_obsT)))
+mg_m0sT <- exp(mean(log(VDNA_metab*summary_experiment$molecules_T))) #molecules/ug
+neffT <- (log(mg_psT)+log(K)-log(mg_m0sT))/log(mg_lam_s_p1)
+
+mg_psG <- exp(mean(log(summary_experiment$prop_obsG)))
+mg_m0sG <- exp(mean(log(VDNA_metab*summary_experiment$molecules_G))) #molecules/ug
+neffG <- (log(mg_psG)+log(K)-log(mg_m0sG))/log(mg_lam_s_p1)
+
+Cycles <- 1:40
+res_exp <- NULL
+for (cyc in Cycles){
+    m0s <- summary_experiment$prop_obsU/(1+summary_experiment$efficiencies)^cyc
+  psU <- m0s/sum(m0s)
+  
+      m0s <- summary_experiment$prop_obsT/(1+summary_experiment$efficiencies)^cyc
+  psT <- m0s/sum(m0s)
+  
+      m0s <- summary_experiment$prop_obsG/(1+summary_experiment$efficiencies)^cyc
+  psG <- m0s/sum(m0s)
+  
+  res_exp <- rbind(res_exp, data.frame(sp = summary_experiment$sp,
+                                       cycle = cyc,
+                                       psU = psU, psT = psT, psG = psG))
+
+}
+
+# res_exp %>% View
+
+ggplot(res_exp)+
+  geom_line(aes(cycle, psU, col = sp))+
+  geom_hline(yintercept = 1/13)+
+  geom_vline(xintercept = neffU)
+
+ggplot(res_exp)+
+  geom_line(aes(cycle, psT, col = sp))
+
+ggplot(res_exp)+
+  geom_line(aes(cycle, psG, col = sp))
+
+```
+
+
+
 
 #### RMSE values
 
@@ -1076,6 +1160,33 @@ AbsErr(resG1$prop_infer_Lambda, resG1$prop_expected)
 RelErr(resG1$prop, resG1$prop_expected)
 RelErr(resG1$prop_infer_mock, resG1$prop_expected)
 RelErr(resG1$prop_infer_Lambda, resG1$prop_expected)
+```
+
+Inference at neffU
+
+```{r inference neffU}
+
+m0s <- summary_experiment$prop_obsU/
+  (1+summary_experiment$efficiencies)^neffU
+psU <- m0s/sum(m0s)
+  
+m0s <- summary_experiment$prop_obsT/
+  (1+summary_experiment$efficiencies)^neffU
+psT <- m0s/sum(m0s)
+  
+m0s <- summary_experiment$prop_obsG/
+  (1+summary_experiment$efficiencies)^neffU
+psG <- m0s/sum(m0s)
+
+AbsErr(psU, summary_experiment$propU)
+RelErr(psU, summary_experiment$propU)
+
+AbsErr(psT, summary_experiment$propT)
+RelErr(psT, summary_experiment$propT)
+
+AbsErr(psG, summary_experiment$propG)
+RelErr(psG, summary_experiment$propG)
+
 ```
 
 #### Hill numbers
@@ -1203,7 +1314,7 @@ M0 = rep(2.5e5/nspecies, nspecies)
 
 #Tested values
 lam1 <- 1
-Lam2 <- seq(0.85, 1, by = 0.001)
+Lam2 <- seq(0.8, 1, by = 0.001)
 
 res <- NULL
 for (lam2 in Lam2){

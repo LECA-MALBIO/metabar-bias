@@ -120,8 +120,9 @@ function simu_pcr(Theta ;
   if length(n_reads) == 1
     n_reads = fill(n_reads, nreplicate)
   end
+  kinetics_tot = vec(sum(kinetics, dims = 2))
   for i in 1:nreplicate
-    kinetics[i,:] .= vec(rand(Multinomial(Int64(n_reads[i]), vec(kinetics ./ sum(kinetics)))))
+    kinetics[i,:] .= vec(rand(Multinomial(Int64(n_reads[i]), vec(kinetics[i,:] ./ kinetics_tot[i]))))
   end
 
   return kinetics
@@ -368,6 +369,9 @@ function optim_Qmetabar(reads_data::Array{Float64, 2}, Lambda::Array{Float64, 1}
   K = 1e11::Float64,
   nsim = 1000::Int64,
   Theta0 = nothing,
+  ninfer = 1,
+  randomTheta0 = false,
+  previousTheta0 = true,
   maxit = 200::Int64,
   gtol = 1e-6::Float64,
   xtol=1e-32::Float64,
@@ -403,12 +407,13 @@ function optim_Qmetabar(reads_data::Array{Float64, 2}, Lambda::Array{Float64, 1}
   opt = Jflimo.flimoptim(nspecies*(ncycles+2),
                      obj = obj,
                      nsim = nsim,
-                     ninfer = 1,
+                     ninfer = ninfer,
                      lower = pdata ./ 5.,
                      upper = pdata .* 5.,
                      AD = true,
                      Theta0 = Theta0,
-                     randomTheta0 = false,
+                     randomTheta0 = randomTheta0,
+                     previousTheta0 = previousTheta0,
                      gtol = gtol,
                      xtol = xtol,
                      maxit = maxit,
@@ -421,7 +426,7 @@ end
 function prop_exp(reads_data, Lambda, low_c = 15, high_c = 30)
   #proportions with the exponential model for ncycles between low_c and high_c
   prop = zeros(length(low_c:high_c), size(reads_data, 2))
-  for s in 1:size(reads_data, 2)
+  for s in 1:axes(reads_data, 2)
     prop[:,s] = mean(reads_data[:,s]) ./ (1+Lambda[s]) .^(low_c:high_c) .* K ./ mean(sum(reads_data, dims = 2))
   end
   prop ./ sum(prop, dims = 2)
