@@ -261,12 +261,13 @@ mean(optU_eff.minimizer, dims = 1)
 median(optU_eff.minimizer, dims = 1)
 std(optU_eff.minimizer, dims = 1)
 
-findall(x->x==median(optU_eff.minimizer, dims = 1)[1,13], optU_eff.minimizer[:,13])
-#2
+CSV.write("data/res_infer_Lambda_K.csv", Tables.table(optU_eff.minimizer))
 
-Lambda_infer = vcat(1., vec(optU_eff.minimizer[2,1:12]))
+index = findall(x->x==median(optU_eff.minimizer, dims = 1)[1,13], optU_eff.minimizer[:,13])[1]
+
+Lambda_infer = vcat(1., vec(optU_eff.minimizer[index,1:12]))
 CSV.write("data/efficiencies_U.csv", Tables.table(Lambda_infer))
-K = optU_eff.minimizer[2,13]*1e12
+K = optU_eff.minimizer[index,13]*1e12
 
 simU = simu_pcr_normalQ_eff(vcat(1., vec(optU_eff.minimizer)),
     rand(190, 13*62),

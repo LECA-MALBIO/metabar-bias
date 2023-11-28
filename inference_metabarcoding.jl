@@ -426,7 +426,7 @@ end
 function prop_exp(reads_data, Lambda, low_c = 15, high_c = 30)
   #proportions with the exponential model for ncycles between low_c and high_c
   prop = zeros(length(low_c:high_c), size(reads_data, 2))
-  for s in 1:axes(reads_data, 2)
+  for s in axes(reads_data, 2)
     prop[:,s] = mean(reads_data[:,s]) ./ (1+Lambda[s]) .^(low_c:high_c) .* K ./ mean(sum(reads_data, dims = 2))
   end
   prop ./ sum(prop, dims = 2)

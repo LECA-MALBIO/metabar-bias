@@ -323,10 +323,10 @@ data_ampli[,1] <- data_ampli[,1] - 1
 
 fitlog <- pcrfit(data_ampli, 1, 2, mlog,
                  weights = weights_log)
-# fitmec <- pcrfit(ampli, 1, 3, mmec, weights = weights)
+# fitmec <- pcrfit(data_ampli, 1, 3, mmec, weights = weights)
 
 res_log <- a*fitlog$m$predict(newdata = fitlog$DATA)
-# res_mec <- a*fitmec$m$predict(newdata = fitmec$DATA)+b
+# res_mec <- a*fitmec$m$predict(newdata = fitmec$DATA)
 ```
 
 Figure:
