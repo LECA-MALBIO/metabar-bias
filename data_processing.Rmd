@@ -29,7 +29,7 @@ output:
     theme: united
 ---
 
-# Setup
+## Setup
 
 This file is used to process the data used for the paper analyses.
 
@@ -41,16 +41,16 @@ library(readxl)
 library(tidyverse)
 ```
 
-Install R package ROBIFastread
+Installing R package ROBIFastread
 
 ```{r setup ROBIFastread, include=FALSE}
 #install_url("https://git.metabarcoding.org/obitools/obitools4/robireadfasta")
 library(ROBIFastread)
 ```
 
-# Data related to the manuscript
+## Data related to the manuscript
 
-## Metabarcodes for marker Sper01 (gh)
+### Metabarcodes for marker Sper01 (gh)
 
 Salvia pratensis has a different barcode as in the database (one insertion)
 
@@ -69,7 +69,7 @@ barcodes <- barcodes %>% filter(species_name != "Rumex_acetosa")
 
 ```
 
-## DNA extraction
+### DNA extraction
 
 The extraction file contains total DNA concentration assayed by Qubit
 
@@ -86,10 +86,9 @@ extraction <- extraction %>% dplyr::select(Espece,
 # write.csv(extraction, "data/extraction.csv", row.names = F)
 ```
 
+### ddPCR data
 
-## ddPCR data
-
-Open, clean, summarise ddPCR data (output of the Quantasoft Software, Biorad)
+Open, clean, summarise ddPCR data (output of the Quantasoft Software by Biorad)
 
 ```{r ddPCR data}
 #First file (Quantasoft)
@@ -281,7 +280,8 @@ summary_dd <- dataddpcr %>% filter(Used & Sample < 100) %>%
                 Molecules_ng, CDNA_sample)
 
 ```
-## Metabarcoding data processing
+
+### Metabarcoding data processing
 
 Processing the data with OBITools version 4
 (https://git.metabarcoding.org/obitools/obitools4/obitools4)
@@ -291,9 +291,9 @@ Three communities:
 * G1 (library 1748) = Geometric
 * U1 (library 1750) = Uniform
 
-### Bash commands
+#### Bash commands
 
-#### Gobipairing
+##### Gobipairing
 
 Paired-end data
 
@@ -303,7 +303,7 @@ Paired-end data
 
 % gobipairing -F 220930_NB501850_A_L1-4_GWM-1750_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1750_R2.fastq.gz > GWM-1750.paired
 
-#### Convert json (made by metabase api) to ngsfilter
+##### Convert json (made by metabase api) to ngsfilter
 
 Uses script format_ngsfilter.py
 Assigns tags to replicates
@@ -314,7 +314,7 @@ Assigns tags to replicates
 
 % python3 format_ngsfilter.py ngs_filter_tube_U1_EC_QMETABAR_210722.json GWM-1750_U1
 
-#### Gobimultiplex
+##### Gobimultiplex
 
 Assigns sequence records to the corresponding experiment/sample based on DNA tags and primers
 
@@ -324,27 +324,27 @@ Assigns sequence records to the corresponding experiment/sample based on DNA tag
 
 % gobimultiplex -t GWM-1750_U1.ngsfilter -u unassigned50 GWM-1750.paired > GWM_1750.demultiplex
 
-#### Gobiuniq
+##### Gobiuniq
 
 Groups and dereplicates sequences
 Merges the libraries
 
 % gobiuniq -m direction -m sample --on-disk GWM_1746.demultiplex GWM_1748.demultiplex GWM_1750.demultiplex > GWM_Sper01.uniq
 
-#### Gobigrep
+##### Gobigrep
 
 Filters sequence file
 Removes singletons, too short and too long variants 
 
 % gobigrep -c 2 -l 25 -L 75 GWM_Sper01.uniq > GWM_Sper01.grep
 
-#### Gobiclean
+##### Gobiclean
 
 Tags a set of sequences for PCR/sequencing errors identification
 
 % gobiclean --save-ratio graphSper01.csv --min-eval-rate 100 --save-graph graph1 GWM_Sper01.grep > GWM_Sper01.clean
 
-#### Gobicount
+##### Gobicount
 
 Counts Reads / Variants
 
@@ -384,14 +384,14 @@ Merged libraries
 % gobicount GWM_Sper01.clean
 28371 / 10202369
 
-#### Robireadfasta
+##### Robireadfasta
 
 Fasta files are read with the R library ROBIFastread available here:
 https://git.metabarcoding.org/obitools/obitools4/robireadfasta
 
 ### Import Metabarcoding data
 
-Data come from a larger experiment. Every replicate containing Spike molecules is removed.
+Data come from a larger experiment. Every replicate containing "Spike" molecules is removed.
 
 Preparing dataframe:
 
@@ -512,7 +512,6 @@ Open data before filtering (grep, clean)
 
 ```
 
-
 Exports data to Julia for Taqman analysis
 
 ```{r export julia}
@@ -575,7 +574,7 @@ matG <- as.matrix(auxG[,-1])
 
 ## Taqman qPCR
 
-### Preparing the taqman experiment
+### Preparing the Taqman experiment
 
 ```{r pipeline taqman}
 #Keep the 3 species analysed
@@ -710,7 +709,6 @@ res_taqman <- res_taqman %>%
 # write.csv(kinetics %>% filter(!Neg), "data/taqman_kinetics.csv",
 #           row.names = F)
 ```
-
 
 ## Tags for metabarcoding PCR
 

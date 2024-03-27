@@ -381,34 +381,31 @@ Sper01 (gh)</a></li>
 <li><a href="#dna-extraction" id="toc-dna-extraction">DNA
 extraction</a></li>
 <li><a href="#ddpcr-data" id="toc-ddpcr-data">ddPCR data</a></li>
-<li><a href="#metabarcoding-data-processing" id="toc-metabarcoding-data-processing">Metabarcoding data processing</a>
-<ul>
-<li><a href="#bash-commands" id="toc-bash-commands">Bash
-commands</a></li>
+<li><a href="#metabarcoding-data-processing" id="toc-metabarcoding-data-processing">Metabarcoding data
+processing</a></li>
 <li><a href="#import-metabarcoding-data" id="toc-import-metabarcoding-data">Import Metabarcoding data</a></li>
 </ul></li>
 <li><a href="#taqman-qpcr" id="toc-taqman-qpcr">Taqman qPCR</a>
 <ul>
-<li><a href="#preparing-the-taqman-experiment" id="toc-preparing-the-taqman-experiment">Preparing the taqman
+<li><a href="#preparing-the-taqman-experiment" id="toc-preparing-the-taqman-experiment">Preparing the Taqman
 experiment</a></li>
 <li><a href="#process-results" id="toc-process-results">Process
 results</a></li>
 </ul></li>
 <li><a href="#tags-for-metabarcoding-pcr" id="toc-tags-for-metabarcoding-pcr">Tags for metabarcoding PCR</a></li>
-</ul></li>
 </ul>
 </div>
 
-<div id="setup" class="section level1">
-<h1>Setup</h1>
+<div id="setup" class="section level2">
+<h2>Setup</h2>
 <p>This file is used to process the data used for the paper
 analyses.</p>
-<p>Install R package ROBIFastread</p>
+<p>Installing R package ROBIFastread</p>
 </div>
-<div id="data-related-to-the-manuscript" class="section level1">
-<h1>Data related to the manuscript</h1>
-<div id="metabarcodes-for-marker-sper01-gh" class="section level2">
-<h2>Metabarcodes for marker Sper01 (gh)</h2>
+<div id="data-related-to-the-manuscript" class="section level2">
+<h2>Data related to the manuscript</h2>
+<div id="metabarcodes-for-marker-sper01-gh" class="section level3">
+<h3>Metabarcodes for marker Sper01 (gh)</h3>
 <p>Salvia pratensis has a different barcode as in the database (one
 insertion)</p>
 <pre class="r"><code>#Open file with barcodes:
@@ -424,8 +421,8 @@ barcodes[barcodes$species_name ==
 
 barcodes &lt;- barcodes %&gt;% filter(species_name != &quot;Rumex_acetosa&quot;)</code></pre>
 </div>
-<div id="dna-extraction" class="section level2">
-<h2>DNA extraction</h2>
+<div id="dna-extraction" class="section level3">
+<h3>DNA extraction</h3>
 <p>The extraction file contains total DNA concentration assayed by
 Qubit</p>
 <pre class="r"><code>#Open/Process extraction file:
@@ -443,10 +440,10 @@ extraction &lt;- extraction %&gt;% dplyr::select(Espece,
 
 # write.csv(extraction, &quot;data/extraction.csv&quot;, row.names = F)</code></pre>
 </div>
-<div id="ddpcr-data" class="section level2">
-<h2>ddPCR data</h2>
-<p>Open, clean, summarise ddPCR data (output of the Quantasoft Software,
-Biorad)</p>
+<div id="ddpcr-data" class="section level3">
+<h3>ddPCR data</h3>
+<p>Open, clean, summarise ddPCR data (output of the Quantasoft Software
+by Biorad)</p>
 <pre class="r"><code>#First file (Quantasoft)
 dataddpcr1 &lt;- read.csv(&quot;data/QMETABAR_MOINARD1204_manual.csv&quot;,
                        header=FALSE)
@@ -638,16 +635,16 @@ summary_dd &lt;- dataddpcr %&gt;% filter(Used &amp; Sample &lt; 100) %&gt;%
                 Molecules_ng, CDNA_sample)</code></pre>
 <pre><code>## Joining with `by = join_by(Sample)`</code></pre>
 </div>
-<div id="metabarcoding-data-processing" class="section level2">
-<h2>Metabarcoding data processing</h2>
+<div id="metabarcoding-data-processing" class="section level3">
+<h3>Metabarcoding data processing</h3>
 <p>Processing the data with OBITools version 4 (<a href="https://git.metabarcoding.org/obitools/obitools4/obitools4" class="uri">https://git.metabarcoding.org/obitools/obitools4/obitools4</a>)</p>
 <p>Three communities: * L1 (library 1746) = uniform in Total DNA
 (renamed T in the paper) * G1 (library 1748) = Geometric * U1 (library
 1750) = Uniform</p>
-<div id="bash-commands" class="section level3">
-<h3>Bash commands</h3>
-<div id="gobipairing" class="section level4">
-<h4>Gobipairing</h4>
+<div id="bash-commands" class="section level4">
+<h4>Bash commands</h4>
+<div id="gobipairing" class="section level5">
+<h5>Gobipairing</h5>
 <p>Paired-end data</p>
 <p>% gobipairing -F 220930_NB501850_A_L1-4_GWM-1746_R1.fastq.gz -R
 220930_NB501850_A_L1-4_GWM-1746_R2.fastq.gz &gt; GWM-1746.paired</p>
@@ -656,8 +653,8 @@ summary_dd &lt;- dataddpcr %&gt;% filter(Used &amp; Sample &lt; 100) %&gt;%
 <p>% gobipairing -F 220930_NB501850_A_L1-4_GWM-1750_R1.fastq.gz -R
 220930_NB501850_A_L1-4_GWM-1750_R2.fastq.gz &gt; GWM-1750.paired</p>
 </div>
-<div id="convert-json-made-by-metabase-api-to-ngsfilter" class="section level4">
-<h4>Convert json (made by metabase api) to ngsfilter</h4>
+<div id="convert-json-made-by-metabase-api-to-ngsfilter" class="section level5">
+<h5>Convert json (made by metabase api) to ngsfilter</h5>
 <p>Uses script format_ngsfilter.py Assigns tags to replicates</p>
 <p>% python3 format_ngsfilter_sylvain.py
 ngs_filter_tube_L1_EC_QMETABAR_210722.json GWM-1746_L1</p>
@@ -666,8 +663,8 @@ ngs_filter_tube_G1_EC_QMETABAR_210722.json GWM-1748_G1</p>
 <p>% python3 format_ngsfilter.py
 ngs_filter_tube_U1_EC_QMETABAR_210722.json GWM-1750_U1</p>
 </div>
-<div id="gobimultiplex" class="section level4">
-<h4>Gobimultiplex</h4>
+<div id="gobimultiplex" class="section level5">
+<h5>Gobimultiplex</h5>
 <p>Assigns sequence records to the corresponding experiment/sample based
 on DNA tags and primers</p>
 <p>% gobimultiplex -t GWM-1746_L1.ngsfilter -u unassigned46
@@ -677,26 +674,26 @@ GWM-1748.paired &gt; GWM_1748.demultiplex</p>
 <p>% gobimultiplex -t GWM-1750_U1.ngsfilter -u unassigned50
 GWM-1750.paired &gt; GWM_1750.demultiplex</p>
 </div>
-<div id="gobiuniq" class="section level4">
-<h4>Gobiuniq</h4>
+<div id="gobiuniq" class="section level5">
+<h5>Gobiuniq</h5>
 <p>Groups and dereplicates sequences Merges the libraries</p>
 <p>% gobiuniq -m direction -m sample –on-disk GWM_1746.demultiplex
 GWM_1748.demultiplex GWM_1750.demultiplex &gt; GWM_Sper01.uniq</p>
 </div>
-<div id="gobigrep" class="section level4">
-<h4>Gobigrep</h4>
+<div id="gobigrep" class="section level5">
+<h5>Gobigrep</h5>
 <p>Filters sequence file Removes singletons, too short and too long
 variants</p>
 <p>% gobigrep -c 2 -l 25 -L 75 GWM_Sper01.uniq &gt; GWM_Sper01.grep</p>
 </div>
-<div id="gobiclean" class="section level4">
-<h4>Gobiclean</h4>
+<div id="gobiclean" class="section level5">
+<h5>Gobiclean</h5>
 <p>Tags a set of sequences for PCR/sequencing errors identification</p>
 <p>% gobiclean –save-ratio graphSper01.csv –min-eval-rate 100
 –save-graph graph1 GWM_Sper01.grep &gt; GWM_Sper01.clean</p>
 </div>
-<div id="gobicount" class="section level4">
-<h4>Gobicount</h4>
+<div id="gobicount" class="section level5">
+<h5>Gobicount</h5>
 <p>Counts Reads / Variants</p>
 <p>Library L1/1746</p>
 <p>% gobicount GWM-1746.paired 3352859 / 3352859 % gobicount
@@ -715,16 +712,17 @@ GWM_1750.demultiplex 3618993 / 3618993 % gobicount unassigned50 291266 /
 GWM_Sper01.grep 28371 / 10202369 % gobicount GWM_Sper01.clean 28371 /
 10202369</p>
 </div>
-<div id="robireadfasta" class="section level4">
-<h4>Robireadfasta</h4>
+<div id="robireadfasta" class="section level5">
+<h5>Robireadfasta</h5>
 <p>Fasta files are read with the R library ROBIFastread available here:
 <a href="https://git.metabarcoding.org/obitools/obitools4/robireadfasta" class="uri">https://git.metabarcoding.org/obitools/obitools4/robireadfasta</a></p>
 </div>
 </div>
+</div>
 <div id="import-metabarcoding-data" class="section level3">
 <h3>Import Metabarcoding data</h3>
-<p>Data come from a larger experiment. Every replicate containing Spike
-molecules is removed.</p>
+<p>Data come from a larger experiment. Every replicate containing
+“Spike” molecules is removed.</p>
 <p>Preparing dataframe:</p>
 <pre class="r"><code>data_Sper01 &lt;- read_obifasta(&quot;data/GWM_Sper01.clean&quot;)
 
@@ -903,7 +901,7 @@ matG &lt;- as.matrix(auxG[,-1])
 <div id="taqman-qpcr" class="section level2">
 <h2>Taqman qPCR</h2>
 <div id="preparing-the-taqman-experiment" class="section level3">
-<h3>Preparing the taqman experiment</h3>
+<h3>Preparing the Taqman experiment</h3>
 <pre class="r"><code>#Keep the 3 species analysed
 taqman &lt;- summary_dd %&gt;%
   filter(Sample %in% c(10, 12, 26)) %&gt;%
@@ -1072,7 +1070,6 @@ primers$Tag &lt;- sapply(1:nrow(primers),
 
 primers$Tag8 &lt;- substr(primers$Tag, nchar(primers$Tag)-8+1,
                        nchar(primers$Tag))</code></pre>
-</div>
 </div>
 
 
