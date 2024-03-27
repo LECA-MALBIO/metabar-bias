@@ -29,6 +29,11 @@ output:
     theme: united
 ---
 
+This script is used to produce the analyses of the paper.
+Our data is preprocessed in the data_processing.Rmd file.
+
+Last edit: 25/03/2024***
+
 ##Setup
 
 ```{r setup, include=FALSE}
@@ -52,16 +57,183 @@ library(qpcR)
 
 ```
 
-This script is used to produce the analyses of the paper.
-Our data is processed in the data_processing.Rmd file.
+## Figure 1: PCR models
 
-Last edit: 14/11/2023
+Fitting exponential and logistic PCR models to qPCR data (SybrGreen) of Capsella bursa-pastoris. Described in Supplementary File 1.
 
-## ddPCR analysis
+### qPCR data
 
-Open digital droplet PCR (ddPCR) data
+Converting RFU to number of molecules for illustrative purpose.
 
-summary_experiment contains all info concerning the concentration assays
+```{r qpcr open data}
+#Open file containing qPCR data
+ampli <- read.csv("data/20210712_101200_CT030043_SPER01_ANALYSE -  Quantification Amplification Results_SYBR.csv")[,-1]
+
+ampli <- ampli %>% pivot_longer(2:ncol(ampli))
+colnames(ampli)[2:3]<- c("Well","RFU")
+ampli <- ampli[ampli$Well == "B7",] #B7: species Cbp, sample 26
+
+K <- 2.455e12 #Charge capacity, computed below
+
+#Convert RFU to molecules
+a <- K/(max(ampli$RFU)-min(ampli$RFU))
+b <- -a*min(ampli$RFU)
+ampli$molecules <- a * ampli$RFU + b
+
+data_ampli <- as.matrix(ampli[,c("Cycle", "RFU")])
+data_ampli[,1] <- data_ampli[,1] - 1
+
+ncycles <- nrow(ampli)
+
+```
+
+### Fitting PCR models
+
+Parameters are fitted numerically. No biological consideration here.
+The function (pcrfit) and the data structure used come from R package qpcR.
+
+Non-zero low weights are given for numerical reasons.
+
+```{r exponential model}
+
+mexp <- cm3 #Reuse model object from package qPCR
+
+#Define model
+
+mexp$expr <- "Fluo ~ mexp$fct(Cycles, c(M0, Lam))"
+mexp$fct <- function(x, parm) {
+  M0 <- parm[1]
+  Lam <- parm[2]
+  Fn <- vector(mode = "numeric", length = length(x))
+  for (i in 1:length(x)) {
+    if (i == 1) Fn[i] <- M0
+    else {
+      Fn[i] <- Fn[i - 1] * (1 + Lam*(1-Fn[i - 1]/K))
+    }
+  }
+  return(Fn)
+}
+mexp$ssFct <- function(x, y) {
+  ## start estimates
+  M0 <- 1
+  Lam <- 1
+  ssVal <- c(M0, Lam)
+  names(ssVal) <- mexp$parnames
+  return(ssVal)
+}
+mexp$inv <- function(y, parm) {
+  x <- 1:100
+  fn <- function(x, parm) mexp$fct(x, parm) - y
+  uniroot(fn, interval = c(1, 100), parm)$root
+}
+mexp$expr.grad <- expression(mexp$fct(Cycles, c(M0, Lam)))
+mexp$parnames <- c("M0", "Lam")
+mexp$name <- "mexp"
+mexp$type <- "my exponential model"
+
+
+#Weight cycles
+
+weights_exp <- c(rep(0, 5), rep(1, 9), rep(1000, 6), rep(0, 41))
+
+fitexp <- pcrfit(data_ampli, 1, 2, mexp,
+                 weights = weights_exp)
+
+res_exp <- a*fitexp$m$predict(newdata = fitexp$DATA) + b
+
+```
+
+```{r logistic model}
+
+mlog <- cm3 #Reuse model object from package qPCR
+
+#Define model
+
+mlog$expr <- "Fluo ~ mlog$fct(Cycles, c(M0, Lam))"
+mlog$fct <- function(x, parm) {
+  M0 <- parm[1]
+  Lam <- parm[2]
+  K <- max(ampli$RFU)
+  Fn <- vector(mode = "numeric", length = length(x))
+  for (i in 1:length(x)) {
+    if (i == 1) Fn[i] <- M0
+    else {
+      if (Fn[i - 1] < K){Fn[i] <- Fn[i - 1] * (1 + Lam*(1-Fn[i - 1]/K)) }
+      else {Fn[i] <- Fn[i - 1]}
+    }
+  }
+  return(Fn)
+}
+mlog$ssFct <- function(x, y) {
+  ## start estimates
+  M0 <- 1
+  Lam <- 1
+  K <- max(ampli$RFU)
+  ssVal <- c(M0, Lam)
+  names(ssVal) <- mlog$parnames
+  return(ssVal)
+}
+mlog$inv <- function(y, parm) {
+  x <- 1:100
+  fn <- function(x, parm) mlog$fct(x, parm) - y
+  uniroot(fn, interval = c(1, 100), parm)$root
+}
+mlog$expr.grad <- expression(mlog$fct(Cycles, c(M0, Lam)))
+mlog$parnames <- c("M0", "Lam")
+mlog$name <- "mlog"
+mlog$type <- "my logistic model"
+
+
+#Weight cycles
+
+weights_log <- c(rep(0, 5), rep(1, 9), rep(1000, 10), rep(1, 15), rep(0, 22))
+
+fitlog <- pcrfit(data_ampli, 1, 2, mlog,
+                 weights = weights_log)
+
+res_log <- a*fitlog$m$predict(newdata = fitlog$DATA) + b
+
+```
+
+### Figure: Fitted PCR models
+
+```{r saturation models - figure 1}
+
+ggplot()+
+        geom_point(data = ampli, aes(Cycle-1, molecules))+
+        geom_line(data = NULL, aes(0:60, res_log,
+                                   col = "Logistic"),
+                  linewidth = 0.75)+
+        geom_point(data = ampli, aes(Cycle-1, molecules))+
+        geom_line(data = NULL, aes(0:60, res_exp,
+                                   col = "Exponential"),
+                  linewidth = 0.75)+
+        labs(x = "Cycle",
+             y = "Estimated number of molecules", 
+             col = "Amplification model")+
+        theme(legend.justification = c(1, 0),
+              legend.position = c(1, 0),
+        legend.box.margin=margin(rep(10, 4)))+
+  scale_colour_brewer(palette = "Set1")+
+    # scale_y_log10()+
+  coord_cartesian(xlim = c(0, 50), ylim = c(1, K))
+#+
+        # ggtitle(
+        #   paste0("Real qPCR data and saturation models - Species : ",
+        #                "Capsella bursa-pastoris"))+
+        #   theme(plot.title = element_text(hjust = 0.5))
+
+# ggsave(filename = "Figures/saturation_models2.pdf",
+#        dpi = 600, units = "mm",
+#        width = 150, height = 100, device = "pdf")
+```
+
+
+## Digital droplet PCR (ddPCR) assays
+
+### ddPCR data
+
+Dataframe summary_experiment contains all info concerning the concentration assays.
 
 ```{r open ddpcr data}
 #QuantaSoft output file with additional data
@@ -96,7 +268,7 @@ summary_experiment <- dataddpcr %>% group_by(Sample) %>%
 
 DNA concentration in the different communities
 
-### Uniform community (U)
+### Uniform community (M_U)
 
 ```{r dna concentration}
 CDNA_U <- 0.5
@@ -115,19 +287,19 @@ summary_experiment <- summary_experiment %>%
           RankG = 13 - rank(CDNA_sample/Volume_equi) + 1)
 ```
 
-Number of molecules in the U community
+Number of molecules in the M_U community
 
-```{r commu U}
+```{r commu M_U}
 VDNA_metab <- 2 #Volume of DNA used in the mix, ul
 VDNA_metab * summary_experiment$molecules_U #Molecules of each species in mix
 VDNA_metab * sum(summary_experiment$molecules_U) #Total number of molecules
 ```
 
-### "Uniform in Total DNA" Communauty (T)
+### "Uniform in Total DNA" Communauty (M_T)
 
-Number of molecules in the T community
+Number of molecules in the M_T community
 
-```{r commu T}
+```{r commu M_T}
 summary_experiment <- summary_experiment %>%
   mutate(molecules_T = C_species_ref*Molecules_ng, #molecules/ul of sample
          propT = molecules_T/sum(molecules_T)) #species proportions
@@ -137,13 +309,11 @@ VDNA_metab * sum(summary_experiment$molecules_T) #total number of molecules
 
 ```
 
-### Geometric community (G)
+### Geometric community (M_G)
 
-2-fold dilution
+Number of molecules in the M_G community (2-fold dilution)
 
-Number of molecules in the G community
-
-```{r commu G}
+```{r commu M_G}
 summary_experiment <- summary_experiment %>%
   mutate(Volume_equi = max(Molecules_ng)/Molecules_ng,
          cDNA_G = CDNA_U/2^RankG*Volume_equi,
@@ -153,9 +323,10 @@ summary_experiment <- summary_experiment %>%
 summary_experiment$molecules_G * VDNA_metab #Molecules of each species in mix
 sum(summary_experiment$molecules_G) * VDNA_metab #Total number of molecules
 ```
-## Analyses 
 
-### Table 1 and Supplementary Table 1
+## Table 1 and Supplementary Table 1: barcodes
+
+Information about the barcodes.
 
 ```{r open barcodes}
 barcodes <- read_excel("data/new_plant_positive_control.xlsx")[,c(2,4:6)]
@@ -173,206 +344,11 @@ barcodes <- barcodes %>% filter(species_name != "Rumex_acetosa")
 barcodes %>% left_join(extraction[,-2])
 ```
 
-### Figure 1 of the manuscript: PCR model
+## Figure 3: ddPCR assays
 
-#### PCR Simulator
-
-Fitting PCR models to qPCR data (SybrGreen) of Capsella bursa-pastoris.
-
-```{r qpcr open data}
-#Open file containing qPCR data
-ampli <- read.csv("data/20210712_101200_CT030043_SPER01_ANALYSE -  Quantification Amplification Results_SYBR.csv")[,-1]
-
-ampli <- ampli %>% pivot_longer(2:ncol(ampli))
-colnames(ampli)[2:3]<- c("Well","RFU")
-
-K <- 7.568463e+12 #Charge capacity, computed below
-
-#Convert RFU to molecules
-a <- K/(max(ampli$RFU)-min(ampli$RFU))
-b <- -a*min(ampli$RFU)
-ampli$molecules <- a * ampli$RFU
-
-ampli <- ampli[ampli$Well == "B7",] #B7: species Cbp, sample 26
-
-```
-
-Parameters are fitted numerically. No biological consideration.
-
-```{r saturation models}
-KWell <- max(ampli$molecules)
-ncycles <- nrow(ampli)
-
-#Best fit exponential model
-fcrit_exp <- function(par,
-                      data = NULL,
-                      low_cycle = 20, high_cycle = 40){
-  m0 <- 10^par[1]
-  lam <- par[2]
-  p <- m0*(1+lam)^seq(0:ncycles)
-  crit <- sum(((p[low_cycle:high_cycle+1]-
-                  data$molecules[low_cycle:high_cycle])/
-                    data$molecules[low_cycle:high_cycle])^2)
-  crit <- crit
-  return(crit)
-}
-
-opt_exp <- optim(c(5.75, 0.55),
-                   fcrit_exp,
-                   data = ampli,
-                   low_cycle= 15,
-                   high_cycle = 23,
-                   lower = c(1, 0.4),
-                   upper = c(10, 0.9),
-                   method = "L-BFGS-B")
-
-#Exponential model
-model_exp <- 10^opt_exp$par[1]*(1+opt_exp$par[2])^seq(0:ncycles)
-
-# mmec <- cm3
-# mmec$expr <- "Fluo ~ mmec$fct(Cycles, c(M0, Lam, K, c, e))"
-# mmec$fct <- function(x, parm) {
-#   M0 <- parm[1]
-#   Lam <- parm[2]
-#   if (Lam < 0) return(NA)
-#   K <- parm[3]
-#   c <- parm[4]
-#   e <- parm[5]
-#   Fn <- vector(mode = "numeric", length = length(x))
-# 
-#   gamma <- function(x){
-#     2/(1+sqrt(1-4*c^2*x*(1-x)))
-#   }
-#   for (i in 1:length(x)) {
-#     if (i == 1) Fn[i] <- M0
-#     else {
-#       lam <- Lam*c*gamma(Fn[i - 1]/K)*(1-Fn[i - 1]/K)*(e-Fn[i - 1]/K)
-#       if (lam > 1) return(NA)
-#       if (Fn[i - 1] < K){Fn[i] <- Fn[i - 1] * (1 + lam) }
-#       else {Fn[i] <- Fn[i - 1]}
-#     }
-#   }
-#   return(Fn)
-# }
-# mmec$ssFct <- function(x, y) {
-#   ## start estimates
-#   M0 <- 1
-#   Lam <- 1
-#   K <- max(y)
-#   c <- 1
-#   e <- 1
-#   ssVal <- c(M0, Lam, K, c, e)
-#   names(ssVal) <- mlog$parnames
-#   return(ssVal)
-# }
-# mmec$inv <- function(y, parm) {
-#   x <- 1:100
-#   fn <- function(x, parm) mlog$fct(x, parm) - y
-#   uniroot(fn, interval = c(1, 100), parm)$root
-# }
-# mmec$expr.grad <- expression(mlog$fct(Cycles, c(M0, Lam, K, c, e)))
-# mmec$parnames <- c("M0", "Lam", "K", "c", "e")
-# mmec$name <- "mmec"
-# mmec$type <- "my mec"
-
-mlog <- cm3
-mlog$expr <- "Fluo ~ mlog$fct(Cycles, c(M0, Lam, K))"
-mlog$fct <- function(x, parm) {
-  M0 <- parm[1]
-  Lam <- parm[2]
-  K <- parm[3]
-  Fn <- vector(mode = "numeric", length = length(x))
-  for (i in 1:length(x)) {
-    if (i == 1) Fn[i] <- M0
-    else {
-      if (Fn[i - 1] < K){Fn[i] <- Fn[i - 1] * (1 + Lam*(1-Fn[i - 1]/K)) }
-      else {Fn[i] <- Fn[i - 1]}
-    }
-  }
-  return(Fn)
-}
-mlog$ssFct <- function(x, y) {
-  ## start estimates
-  M0 <- 1
-  Lam <- 1
-  K <- max(y)
-  ssVal <- c(M0, Lam, K)
-  names(ssVal) <- mlog$parnames
-  return(ssVal)
-}
-mlog$inv <- function(y, parm) {
-  x <- 1:100
-  fn <- function(x, parm) mlog$fct(x, parm) - y
-  uniroot(fn, interval = c(1, 100), parm)$root
-}
-mlog$expr.grad <- expression(mlog$fct(Cycles, c(M0, Lam, K)))
-mlog$parnames <- c("M0", "Lam", "K")
-mlog$name <- "mlog"
-mlog$type <- "my log"
-
-#Weight cycles according to amplification step
-#For graphical purpose here
-
-weights_log <- c(rep(1, 12), rep(100, 4), 1000, rep(200, 3),
-                 rep(50, 5),
-                 rep(1, 25), rep(500, 1), rep(0, 10))
-# weights <- c(rep(1, 14), rep(10, 11), rep(1, 26), rep(0, 10))
-
-data_ampli <- as.matrix(ampli[,c("Cycle", "RFU")])
-data_ampli[,1] <- data_ampli[,1] - 1
-
-fitlog <- pcrfit(data_ampli, 1, 2, mlog,
-                 weights = weights_log)
-# fitmec <- pcrfit(data_ampli, 1, 3, mmec, weights = weights)
-
-res_log <- a*fitlog$m$predict(newdata = fitlog$DATA)
-# res_mec <- a*fitmec$m$predict(newdata = fitmec$DATA)
-```
-
-Figure:
-
-```{r saturation models - figure}
-
-model_exp2 <- 10^7.75*(1+0.595)^seq(0:ncycles)
-
-ggplot()+
-        geom_point(data = ampli, aes(Cycle-1, molecules))+
-        geom_line(data = NULL, aes(0:60, res_log,
-                                   col = "Logistic"),
-                  linewidth = 0.75)+
-        geom_line(aes(0:60, model_exp2[-1],
-                      col = "Exponential"),
-                  linewidth = 0.75)+
-        # geom_line(aes(0:(60-1), pmec[-1,1],
-        #               col = "Mechanistic"), linewidth = 0.75)+
-        labs(x = "Cycle",
-             y = "Estimated number of molecules", 
-             col = "Amplification model")+
-        theme(legend.justification = c(1, 0),
-              legend.position = c(1, 0),
-        legend.box.margin=margin(rep(10, 4)))+
-  scale_colour_brewer(palette = "Set1")+
-    # scale_y_log10()+
-  coord_cartesian(xlim = c(0, 50), ylim = c(1, KWell))
-#+
-        # ggtitle(
-        #   paste0("Real qPCR data and saturation models - Species : ",
-        #                "Capsella bursa-pastoris"))+
-        #   theme(plot.title = element_text(hjust = 0.5))
-
-# ggsave(filename = "Figures/saturation_models2.pdf",
-#        dpi = 600, units = "mm",
-#        width = 150, height = 100, device = "pdf")
-```
-
-
-
-
-
-### Figure 3 of the manuscript: ddPCR results
+Target concentrations of each sample
 
 ```{r ddpcr analysis}
-
 
 data_dd_fig <- dataddpcr %>%
   left_join(summary_experiment %>% dplyr::select(sp, species_name, RankG))
@@ -410,7 +386,7 @@ ggplot(data_dd_fig)+
 #        width = 150, height = 90)
 ```
 
-Stats ddPCR:
+Statistics from ddPCR assays:
 
 Species Populus tremula and Rhododendron ferrugineum
 
@@ -431,7 +407,7 @@ summary_experiment$Molecules_ng %>% summary
 ```
 
 
-## Metabarcoding analysis
+## Metabarcoding results
 
 Pipeline from raw fastq data: see data_processing.Rmd file
 
@@ -468,9 +444,11 @@ ggplot(summary_sample %>%
 
 ```
 
-### Uniform Community (U)
+### Data preparation
 
-```{r analysis U}
+Community M_U
+
+```{r analysis M_U}
 df_targetU <- df_Sper01 %>%
   filter(Community == "U" &
            species_name %in% barcodes$species_name &
@@ -481,9 +459,9 @@ df_targetU <- df_Sper01 %>%
   rename(prop_expected = propU)
 ```
 
-### uniform in Total DNA Community (T)
+Community M_T
 
-```{r analysis T}
+```{r analysis M_T}
 df_targetT <- df_Sper01 %>%
   filter(Community == "T" &
            species_name %in% barcodes$species_name &
@@ -494,9 +472,9 @@ df_targetT <- df_Sper01 %>%
   rename(prop_expected = propT)
 ```
 
-### Geometric Community (G)
+Community M_G
 
-```{r analysis G}
+```{r analysis M_G}
 df_targetG <- df_Sper01 %>%
   filter(Community == "G" &
            species_name %in% barcodes$species_name &
@@ -507,7 +485,7 @@ df_targetG <- df_Sper01 %>%
   rename(prop_expected = propG)
 ```
 
-### Figure 4 of the manuscript
+### Figure 4: observed and expected proportions
 
 ```{r observed proportions}
 colp <- c("Expected" = "gold",
@@ -591,41 +569,15 @@ df_targetU %>% group_by(sp) %>% summarise(s = sd(prop), m = mean(prop)) %>%arran
 df_targetG %>% group_by(sp) %>% summarise(s = sd(prop), m = mean(prop)) %>%arrange(m)
 ```
 
-
-Export to Julia to infer efficiencies
-
-```{r export julia U}
-readsU <- df_targetU %>%
-  dplyr::select(Sample, obiclean_weight, species_name) %>%
-  pivot_wider(names_from = species_name,
-              values_from = obiclean_weight) %>% ungroup %>% dplyr::select(-Sample)
-
-# write_csv(readsU, "data/reads_U.csv")
-
-readsT <- df_targetT %>%
-  dplyr::select(Sample, obiclean_weight, species_name) %>%
-  pivot_wider(names_from = species_name,
-              values_from = obiclean_weight) %>% ungroup %>% dplyr::select(-Sample)
-
-# write_csv(readsT, "data/reads_T.csv")
-
-readsG <- df_targetG %>%
-  dplyr::select(Sample, obiclean_weight, species_name) %>%
-  pivot_wider(names_from = species_name,
-              values_from = obiclean_weight,
-              values_fill = 0) %>% ungroup %>% dplyr::select(-Sample)
-
-# write_csv(readsG, "data/reads_G.csv")
-```
-
-### Ratio correction from a reference mock community (U)
+## Ratio correction from a reference mock community (M_U)
 
 Correction factor is:
 
 a_s = prop_obs(s)/prop_init(s) (* constant value)
 
-then prop_infer(s) = prop_obs(s)/a_s(commuU)
+then prop_infer_mock(s) = prop_obs(s)/a_s(commuU)
 
+where prop_infer_mock are the inferred proportions established by the ratio correction.
 
 ```{r correction mock}
 order_sp <- summary_experiment %>% dplyr::select(species_name, RankG) %>%
@@ -635,7 +587,7 @@ correcU <- df_targetU %>%
   group_by(species_name) %>%
   summarise(correc = median(prop)/prop_expected[1])
 
-#U
+#M_U
 df_targetU <- df_targetU %>% left_join(correcU)
 df_targetU$prop_infer_mock <- df_targetU$prop/df_targetU$correc
 df_targetU <- df_targetU %>%
@@ -647,7 +599,7 @@ df_targetU$species_name <- factor(df_targetU$species_name,
                                   levels = order_sp,
                                   ordered = T)
 
-#T
+#M_T
 df_targetT <- df_targetT %>% left_join(correcU)
 df_targetT$prop_infer_mock <- df_targetT$prop/df_targetT$correc
 df_targetT <- df_targetT %>%
@@ -658,7 +610,7 @@ df_targetT$species_name <- factor(df_targetT$species_name,
                                   levels = order_sp,
                                   ordered = T)
 
-#G
+#M_G
 df_targetG <- df_targetG %>% left_join(correcU)
 df_targetG$prop_infer_mock <- df_targetG$prop/df_targetG$correc
 df_targetG <- df_targetG %>%
@@ -672,7 +624,7 @@ df_targetG$species_name <- factor(df_targetG$species_name,
 ```
 
 
-```{r T and G corrected by U}
+```{r M_T and M_G corrected by M_U figures}
 
 # ginferT1 <- ggplot(df_targetT)+
 #   geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
@@ -723,9 +675,7 @@ df_targetG$species_name <- factor(df_targetG$species_name,
 
 ```
 
-Inference results:
-
-prop_infer_mock = Proportions inferred by the ratio corection established from the U community
+Merge the results
 
 ```{r inference results}
 resU1 <- df_targetU %>% group_by(species_name) %>%
@@ -741,7 +691,84 @@ resG1 <- df_targetG %>% group_by(species_name) %>%
             prop_infer_mock = median(prop_infer_mock))
 ```
 
-### Taqman assay
+## Efficiencies inference
+
+### Export data to Julia
+
+Export data to Julia to infer efficiencies with flimo
+
+```{r export julia}
+readsU <- df_targetU %>%
+  dplyr::select(Sample, obiclean_weight, species_name) %>%
+  pivot_wider(names_from = species_name,
+              values_from = obiclean_weight) %>% ungroup %>% dplyr::select(-Sample)
+
+# write_csv(readsU, "data/reads_U.csv")
+
+readsT <- df_targetT %>%
+  dplyr::select(Sample, obiclean_weight, species_name) %>%
+  pivot_wider(names_from = species_name,
+              values_from = obiclean_weight) %>% ungroup %>% dplyr::select(-Sample)
+
+# write_csv(readsT, "data/reads_T.csv")
+
+readsG <- df_targetG %>%
+  dplyr::select(Sample, obiclean_weight, species_name) %>%
+  pivot_wider(names_from = species_name,
+              values_from = obiclean_weight,
+              values_fill = 0) %>% ungroup %>% dplyr::select(-Sample)
+
+# write_csv(readsG, "data/reads_G.csv")
+```
+
+### Proportions corrected with PCR efficiencies
+
+Proportions inferred in Julia using PCR efficiencies
+
+Run inference_metabarcoding.jl (functions) and inference_pcr_efficiency.jl (inference of efficiencies from M_U and then proportions in M_T and M_G)
+
+Inference with the flimo method
+- reads in M_U used to infer efficiencies
+- then efficiencies used to infer proportions in M_T and M_G
+
+#### Efficiencies
+
+```{r efficiencies M_U Julia}
+#Inferred efficiencies
+efficiencies_infer <- t(read_csv("data/efficiencies_U.csv"))
+colnames(efficiencies_infer) <- colnames(readsU)
+
+summary_experiment <- summary_experiment %>%
+  left_join(efficiencies_infer %>%
+              as_tibble() %>%
+              pivot_longer(1:13, names_to = "species_name",
+                           values_to = "efficiencies"))
+```
+
+#### Inferred proportions in M_T and M_G
+
+```{r results julia M_T}
+inferT <- read.csv("data/prop_inferT.csv")
+colnames(inferT) <- colnames(readsT)
+resT1 <- resT1 %>%
+  left_join(inferT %>% pivot_longer(everything(),
+                                    names_to = "species_name",
+                                    values_to = "prop_infer_Lambda")) %>%
+  arrange(-dplyr::row_number())
+
+```
+
+```{r results julia M_G}
+inferG <- read.csv("data/prop_inferG.csv")
+colnames(inferG) <- colnames(readsG)
+resG1 <- resG1 %>%
+  left_join(inferG %>% pivot_longer(everything(),
+                                    names_to = "species_name",
+                                    values_to = "prop_infer_Lambda")) %>%
+  arrange(-dplyr::row_number())
+```
+
+## Taqman assay
 
 Open data (prepared in data_processing.Rmd)
 
@@ -763,7 +790,7 @@ ggplot(res_taqman)+
   ggtitle("Ct = f(log(Concentration))")
 ```
 
-#### First try: linear regression
+### First step: linear regression
 
 ```{r linear regression taqman}
 Vmix_taq <- 25 #ul
@@ -822,7 +849,7 @@ res_lm_test %>% group_by(probe) %>% summarise(min = min(slope),
 
 ```
 
-#### Infer constants of the model
+### Infer constants of the model
 
 RFU Threshold for each well
 
@@ -852,8 +879,7 @@ K <- res_taqman %>%
 
 ```
 
-
-#### Computing PCR efficiencies
+### Computing PCR efficiencies
 
 ```{r pcr efficiencies}
 efficiencies <- res_taqman %>%
@@ -875,7 +901,7 @@ res_taqman <- res_taqman %>% left_join(lam)
 ```
 
 
-#### Normalise End.RFU for Cbe
+### Normalise End.RFU for Cbe
 
 To compare the 2 probes
 
@@ -937,8 +963,7 @@ ggplot(res_taqman %>% filter(!Neg & sp == "Cbe"))+
   geom_point(aes(Dilu, Cq, col = probe))
 ```
 
-
-#### Amplification bias
+### Amplification bias
 
 Comparing the 3 species
 
@@ -959,43 +984,9 @@ qmet %>% group_by(species_name) %>%
 
 ```
 
-### Proportions corrected with PCR efficiencies
-
-Proportions inferred in Julia using PCR efficiencies
-
-Run inference_metabarcoding.jl (functions) and inference_pcr_efficiency.jl (inference of efficiencies from U and proportions in T and G)
-
-Inference with the flimo method
-- reads in U used to infer efficiencies
-- efficiencies used to infer proportions in T and G
-
-#### Efficiencies
-
-```{r efficiencies U Julia}
-#Inferred efficiencies
-efficiencies_infer <- t(read_csv("data/efficiencies_U.csv"))
-colnames(efficiencies_infer) <- colnames(readsU)
-
-summary_experiment <- summary_experiment %>%
-  left_join(efficiencies_infer %>%
-              as_tibble() %>%
-              pivot_longer(1:13, names_to = "species_name",
-                           values_to = "efficiencies"))
-```
-### C-values, Supp Table 1
-
-```{r 1cvalues}
-summary_experiment$Cvalue <- c(0.46, 0.45, 1.03, 0.84, 0.70, 17.29,
-                               1.02, 6.35, 1.40, 0.40, 1.76, 0.74, 0.87)
-
-summary_experiment <- summary_experiment %>%
-  mutate(copies_genome = Molecules_ng*1e9*Cvalue*1e-12)
-
-summary_experiment
-```
 
 
-#### Table 2
+## Table 2: Amplification efficiencies and proportions in M_U
 
 ```{r table2}
 resU1 %>% dplyr::select(species_name, prop_expected, prop)
@@ -1014,41 +1005,22 @@ summary_experiment %>% arrange(RankG) %>%
 ```
 
 
-#### Inferred proportions
+## Table 3: proportions in M_T and M_G
 
-```{r results julia T}
-inferT <- read.csv("data/prop_inferT.csv")
-colnames(inferT) <- colnames(readsT)
-resT1 <- resT1 %>%
-  left_join(inferT %>% pivot_longer(everything(),
-                                    names_to = "species_name",
-                                    values_to = "prop_infer_Lambda")) %>%
-  arrange(-dplyr::row_number())
+Inferred proportions in M_T and M_G
 
-```
-
-```{r results julia G}
-inferG <- read.csv("data/prop_inferG.csv")
-colnames(inferG) <- colnames(readsG)
-resG1 <- resG1 %>%
-  left_join(inferG %>% pivot_longer(everything(),
-                                    names_to = "species_name",
-                                    values_to = "prop_infer_Lambda")) %>%
-  arrange(-dplyr::row_number())
-```
-
-### Table 3
-
-#### Proportions
+### Proportions
 
 ```{r Table 3}
 resT1
 resG1
 ```
 
-#### Proportions with exponential model
+### Proportions with exponential model
 
-Computation of neff for M_U
+Computation of neff for M_U (number of effective exponential cycles)
+
+***texte!!!
 
 ```{r}
 
@@ -1060,7 +1032,7 @@ summary_experiment <- summary_experiment %>%
   left_join(resG1 %>% dplyr::select(species_name, prop) %>%
               rename(prop_obsG = prop))
 
-K <- 2.455e12
+K <- 2.455e12 #***ça sort d'où ?????
 mg_lam_s_p1 <- exp(mean(log(summary_experiment$efficiencies+1)))
 
 mg_psU <- exp(mean(log(summary_experiment$prop_obsU)))
@@ -1109,11 +1081,9 @@ ggplot(res_exp)+
 ```
 
 
+### Estimation error: RMSE values
 
-
-#### RMSE values
-
-RMSE to compare observed/corrected vs expected proportions
+RMSE (root mean squared error) to compare observed/corrected vs expected proportions
 Either absolute or relative
 
 ```{r rmse}
@@ -1162,7 +1132,7 @@ RelErr(resG1$prop_infer_mock, resG1$prop_expected)
 RelErr(resG1$prop_infer_Lambda, resG1$prop_expected)
 ```
 
-Inference at neffU
+Inference at neffU ***c'est quoi ???
 
 ```{r inference neffU}
 
@@ -1189,7 +1159,9 @@ RelErr(psG, summary_experiment$propG)
 
 ```
 
-#### Hill numbers
+###Associated biodiversity measures: Hill numbers
+
+***dire ce qu'on fait !!!
 
 ```{r}
 #Hill
@@ -1253,7 +1225,7 @@ ginferG1
 
 ```
 
-## Figure 5 of the manuscript: impact of efficiency variations
+## Figure 5: Simulations: impact of efficiency variations
 
 Simulated amplification to quantify the effect of 
 efficiency differences.
@@ -1262,7 +1234,7 @@ efficiency differences.
 
 New function to simulate PCR with multiple species
 
-```{r simu pcr 2 species}
+```{r simu pcr multi species}
 pcr_sim <- function(m0=1,
                     lambda=rep(1, length(m0)),
                     K=1e11,
@@ -1333,7 +1305,7 @@ prop2 <- df_targetU %>% group_by(sp) %>%
 
 Figure:
 
-```{r simu pcr 2 species : fig}
+```{r simu pcr multi species : figure}
 #Labels positions
 prop2$labelx <- prop2$deff - 0.0021
 prop2[prop2$sp == "Rfe","labelx"] <- prop2[prop2$sp == "Rfe","labelx"]+
@@ -1394,7 +1366,23 @@ ggplot()+
 
 ```
 
-### Supplementary Table 2
+
+## Supplementary Table 1: C-values
+
+Mass of one genome
+
+```{r 1cvalues}
+summary_experiment$Cvalue <- c(0.46, 0.45, 1.03, 0.84, 0.70, 17.29,
+                               1.02, 6.35, 1.40, 0.40, 1.76, 0.74, 0.87)
+
+summary_experiment <- summary_experiment %>%
+  mutate(copies_genome = Molecules_ng*1e9*Cvalue*1e-12)
+
+summary_experiment
+```
+
+
+## Supplementary Table 2: communities composition
 
 ```{r sup table 2}
 summary_experiment %>% arrange(RankG)
