@@ -42,7 +42,7 @@ end
 
 ## PCR Simulation
 
-#The implemented model is the logistic model***
+#The implemented model is the logistic model
 #
 # Lambda is an array containing the amplification rates of each species (0 <= Lambda <= 1)
 # K is the charge capacity
@@ -278,7 +278,7 @@ function simu_pcr_normalQ(Theta,
 
   kinetics[kinetics .< zero(eltype(m0))] .= zero(eltype(m0))
   
-  return kinetics .* n_reads ./ sum(kinetics, dims = 2) #***uncorrect conditionning
+  return kinetics .* n_reads ./ sum(kinetics, dims = 2) #uncorrect conditionning*** -> multinomial
 end
 
 
@@ -526,7 +526,7 @@ function J_efficiencies(Theta,
     Kmult = 1e12)
 
     #One should choose nsim = k * nreplicate, k integer
-  K = 10^Theta[length(Theta)]*Kmult #***log
+  K = 10^Theta[length(Theta)]*Kmult #log10(K) stored in Theta
   Theta = vcat(lambda_max, vec(Theta[1:(length(Theta)-1)])) #most abundant species in first position !!!
 
   nsim = size(quantiles, 1) #number of simulations to perform by flimo
@@ -618,7 +618,7 @@ function optim_efficiencies(reads_data::Array{Float64, 2}, m0::Array{Float64, 1}
   
     #pdata = vec(mean(reads_data ./ sum(reads_data, dims = 2), dims = 1)) #average species proportions in data
     if (isnothing(Theta0))
-      Theta0 = vcat(fill(lambda_max*0.999, nspecies-1), 0.) #log***
+      Theta0 = vcat(fill(lambda_max*0.999, nspecies-1), 0.) #log10(K)
     end
     obj = (Theta, quantiles) -> J_efficiencies(Theta, quantiles,
                                           reads_data = reads_data,

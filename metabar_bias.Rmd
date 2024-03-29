@@ -34,7 +34,6 @@ Our data is preprocessed in the data_processing.Rmd file.
 
 Last edit: 30/03/2024
 
-***Update le readme aussi
 
 ##Setup
 
@@ -734,12 +733,10 @@ readsG <- df_targetG %>%
 
 Proportions inferred in Julia using PCR efficiencies
 
-Run inference_metabarcoding.jl (functions) and inference_pcr_efficiency.jl (inference of efficiencies from M_U and then proportions in M_T and M_G)
+Run metabar_bias_functions.jl (functions), inference_pcr_efficiencies_ps.jl (inference of efficiencies from M_U and then proportions in M_T and M_G) and inference_taqman.jl (processing the taqman analysis)
 
-***à adapter si le code change...
-
-Inference with the flimo method ***à développer/préciser
-- reads in M_U used to infer efficiencies
+Inference with the flimo method
+- reads in M_U used to infer efficiencies Lambda_s and K
 - then efficiencies used to infer proportions in M_T and M_G
 
 #### Efficiencies
@@ -1391,8 +1388,8 @@ ggplot()+
 
 # rep(c(1,0.95), 6)
 
-ggsave(filename = "Figures/simu_efficiencies.pdf", units = "mm",
-       height = 100, width = 150, device = "pdf", dpi = 600)
+# ggsave(filename = "Figures/simu_efficiencies.pdf", units = "mm",
+#        height = 100, width = 150, device = "pdf", dpi = 600)
 
 ```
 
@@ -1468,9 +1465,7 @@ compo %>% filter(sp %in% c("Rca", "Gro")) %>% group_by(M0tot, sp) %>%
 ### Varying initial quantities, inferred abundances
 
 Data are generated with the logistic model.
-Corrections are brought with our approach and with the ratio method (exponential model)
-
-***a-t-on bien expliqué que ratio = modèle exp ?
+Corrections are brought with our approach and with the ratio method (assuming exponential model)
 
 ```{r comparing the two approaches}
 #Ratio factor computed in correcU
@@ -1494,7 +1489,7 @@ for(i in 1:length(M0tot)){
     dplyr::select(sim, species_name, ps) %>%
     pivot_wider(names_from = species_name, values_from = ps) %>%
     dplyr::select(colnames(readsU)) %>% as.matrix()
-  write.csv(mat, paste0("data/sim100_m0tot_", i, ".csv"),row.names = F)
+  # write.csv(mat, paste0("data/sim100_m0tot_", i, ".csv"),row.names = F)
 }
 
 ```
@@ -1555,9 +1550,9 @@ ggplot(compo)+
   theme(legend.title = element_text(hjust = 0.5),
     plot.title = element_text(hjust = 0.5))
 
-ggsave(filename = "Figures/simu_exp_log.pdf",
-       dpi = 600, units = "mm",
-       width = 150, height = 180, device = "pdf")
+# ggsave(filename = "Figures/simu_exp_log.pdf",
+#        dpi = 600, units = "mm",
+#        width = 150, height = 180, device = "pdf")
 
 ```
 
