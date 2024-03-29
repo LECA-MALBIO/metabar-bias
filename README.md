@@ -12,7 +12,6 @@ bioRxiv 2023.10.03.560640; doi: https://doi.org/10.1101/2023.10.03.560640*
 
 All raw data files are processed with the scripts in data_processing.Rmd.
 
-Analyses are done in the scripts in metabar_bias.Rmd and with the Julia scripts inference_metabarcoding.jl and inference_pcr_efficiency.jl
-(explained in metabar_bias.Rmd).
+Analyses are done in the scripts in metabar_bias.Rmd and with the Julia scripts metabar_bias_functions.jl, inference_pcr_efficiencies_ps.jl and inference_taqman.jl (explained in metabar_bias.Rmd).
 
 The Taqman probes are designed in Taqman_design.Rmd.
