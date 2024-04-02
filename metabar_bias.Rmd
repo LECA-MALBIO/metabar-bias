@@ -1492,6 +1492,20 @@ for(i in 1:length(M0tot)){
   # write.csv(mat, paste0("data/sim100_m0tot_", i, ".csv"),row.names = F)
 }
 
+df_targetU2 <- df_targetU %>% left_join(correcU)
+
+ggplot(compo)+
+    geom_boxplot(data = df_targetU2, aes(sp, prop, col = "MU"),
+                 alpha = 0.2)+
+    geom_boxplot(data = df_targetU2, aes(sp, prop/correc, col = "MU_correc"),
+                 alpha = 0.2)+
+  geom_boxplot(aes(sp, ps, col = "sim"), alpha = 0.2)+
+  geom_boxplot(aes(sp, ps/correc, col = "sim_correc"), alpha = 0.2)+
+  facet_wrap(.~M0tot, ncol = 1)+
+  geom_hline(yintercept = 1/13)
+
+
+
 ```
 
 Inference results computed in Julia
@@ -1501,7 +1515,6 @@ Inference results computed in Julia
 res_commu1 <- read.csv("data/res_commu1.csv")
 res_commu2 <- read.csv("data/res_commu2.csv")
 res_commu3 <- read.csv("data/res_commu3.csv")
-
 
 colnames(res_commu1) <- colnames(readsU)
 colnames(res_commu2) <- colnames(readsU)
@@ -1525,16 +1538,19 @@ res_commu3 <- res_commu3 %>% as_tibble() %>%
 res_infer_log <- rbind(res_commu1, res_commu2, res_commu3)
 ```
 
-Figure to compare the two approaches
+Supplementary Figure 3
+
+to compare the two approaches
+
+(***ordre des espèces commme dans le papier...)
 
 ```{r figure comparing two approaches}
 
-
 ggplot(compo)+
   geom_boxplot(aes(sp, ps_ratio,
-                   group = sp, col = "Ratio"))+
+                   group = sp, col = "Ratio"), alpha = 0.1)+
   geom_boxplot(data = res_infer_log, aes(sp, ps_log,
-                   group = sp, col = "Logistic model"))+
+                   group = sp, col = "Logistic model"), alpha = 0.1)+
   geom_point(data = summary_experiment,
              aes(sp, 1/nrow(summary_experiment),
                  fill = "Expected\nwithout\nPCR bias"),
@@ -1550,9 +1566,9 @@ ggplot(compo)+
   theme(legend.title = element_text(hjust = 0.5),
     plot.title = element_text(hjust = 0.5))
 
-# ggsave(filename = "Figures/simu_exp_log.pdf",
-#        dpi = 600, units = "mm",
-#        width = 150, height = 180, device = "pdf")
+ggsave(filename = "Figures/simu_exp_log.pdf",
+       dpi = 600, units = "mm",
+       width = 150, height = 180, device = "pdf")
 
 ```
 
