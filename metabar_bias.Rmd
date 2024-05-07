@@ -711,14 +711,26 @@ readsU <- df_targetU %>%
   pivot_wider(names_from = species_name,
               values_from = obiclean_weight) %>% ungroup %>% dplyr::select(-Sample)
 
+qty_initU <- left_join(data.frame(species_name = colnames(readsU)),
+                       summary_experiment %>%
+                         dplyr::select(species_name, molecules_U)) %>%
+              pull(molecules_U)
+
 # write_csv(readsU, "data/reads_U.csv")
+# write_csv(data.frame(qty_initU), "data/qty_initU.csv")
 
 readsT <- df_targetT %>%
   dplyr::select(Sample, obiclean_weight, species_name) %>%
   pivot_wider(names_from = species_name,
               values_from = obiclean_weight) %>% ungroup %>% dplyr::select(-Sample)
 
+qty_initT <- left_join(data.frame(species_name = colnames(readsU)),
+                       summary_experiment %>%
+                         dplyr::select(species_name, molecules_T)) %>%
+              pull(molecules_T)
+
 # write_csv(readsT, "data/reads_T.csv")
+# write_csv(data.frame(qty_initT), "data/qty_initT.csv")
 
 readsG <- df_targetG %>%
   dplyr::select(Sample, obiclean_weight, species_name) %>%
@@ -726,7 +738,13 @@ readsG <- df_targetG %>%
               values_from = obiclean_weight,
               values_fill = 0) %>% ungroup %>% dplyr::select(-Sample)
 
+qty_initG <- left_join(data.frame(species_name = colnames(readsU)),
+                       summary_experiment %>%
+                         dplyr::select(species_name, molecules_G)) %>%
+              pull(molecules_G)
+
 # write_csv(readsG, "data/reads_G.csv")
+# write_csv(data.frame(qty_initG), "data/qty_initG.csv")
 ```
 
 ### Proportions corrected with PCR efficiencies

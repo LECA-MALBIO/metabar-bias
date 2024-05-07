@@ -372,12 +372,12 @@ function optim_Qmetabar(reads_data::Array{Float64, 2}, Lambda::Array{Float64, 1}
     xtol=1e-32::Float64,
     dispersion = 1.::Float64,
     model = "logistic",
-    c = 1.,
-    e = 1.)
+    c = 1., #mechanistic model, not shown in paper
+    e = 1.) #mechanistic model, not shown in paper
   
     #reads_data: 2D array. Rows = replicates, Col = species
   
-    nreplicate = size(reads_data, 1)
+    #nreplicate = size(reads_data, 1)
     nspecies = size(reads_data, 2)
   
     n_reads_repli = sum(reads_data, dims = 2)
@@ -527,7 +527,10 @@ function J_efficiencies(Theta,
 
     #One should choose nsim = k * nreplicate, k integer
   K = 10^Theta[length(Theta)]*Kmult #log10(K) stored in Theta
-  Theta = vcat(lambda_max, vec(Theta[1:(length(Theta)-1)])) #most abundant species in first position !!!
+  if !isnothing(lambda_max)
+    Theta = vcat(lambda_max, vec(Theta[1:(length(Theta)-1)])) #most abundant species in first position !!!
+  end
+  
 
   nsim = size(quantiles, 1) #number of simulations to perform by flimo
 
