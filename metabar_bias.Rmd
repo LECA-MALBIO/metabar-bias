@@ -711,14 +711,26 @@ readsU <- df_targetU %>%
   pivot_wider(names_from = species_name,
               values_from = obiclean_weight) %>% ungroup %>% dplyr::select(-Sample)
 
+qty_initU <- left_join(data.frame(species_name = colnames(readsU)),
+                       summary_experiment %>%
+                         dplyr::select(species_name, molecules_U)) %>%
+              pull(molecules_U)
+
 # write_csv(readsU, "data/reads_U.csv")
+# write_csv(data.frame(qty_initU), "data/qty_initU.csv")
 
 readsT <- df_targetT %>%
   dplyr::select(Sample, obiclean_weight, species_name) %>%
   pivot_wider(names_from = species_name,
               values_from = obiclean_weight) %>% ungroup %>% dplyr::select(-Sample)
 
+qty_initT <- left_join(data.frame(species_name = colnames(readsU)),
+                       summary_experiment %>%
+                         dplyr::select(species_name, molecules_T)) %>%
+              pull(molecules_T)
+
 # write_csv(readsT, "data/reads_T.csv")
+# write_csv(data.frame(qty_initT), "data/qty_initT.csv")
 
 readsG <- df_targetG %>%
   dplyr::select(Sample, obiclean_weight, species_name) %>%
@@ -726,7 +738,13 @@ readsG <- df_targetG %>%
               values_from = obiclean_weight,
               values_fill = 0) %>% ungroup %>% dplyr::select(-Sample)
 
+qty_initG <- left_join(data.frame(species_name = colnames(readsU)),
+                       summary_experiment %>%
+                         dplyr::select(species_name, molecules_G)) %>%
+              pull(molecules_G)
+
 # write_csv(readsG, "data/reads_G.csv")
+# write_csv(data.frame(qty_initG), "data/qty_initG.csv")
 ```
 
 ### Proportions corrected with PCR efficiencies
@@ -1417,11 +1435,11 @@ summary_experiment %>% arrange(RankG)
 
 ## Simulations of mock communities
 
-100 simulated communities for each of the 3 M0tot values
+100 simulated communities for each of the 3 M0tot values with 13 species
 
 ###Varying initial quantity, final abundances
 
-If the initial number of molecules varies in the M_U community:
+The initial number of molecules varies in the M_U community:
 
 ```{r MU changing M0}
 
@@ -1467,9 +1485,16 @@ compo %>% filter(sp %in% c("Rca", "Gro")) %>% group_by(M0tot, sp) %>%
 Data are generated with the logistic model.
 Corrections are brought with our approach and with the ratio method (assuming exponential model)
 
-```{r comparing the two approaches}
-#Ratio factor computed in correcU
-compo <- compo %>% left_join(correcU) %>%
+```{r Ratio method}
+
+compo_ref <- compo %>% filter(M0tot == 2.5e5) %>% group_by(sp) %>%
+  summarise(med_ps = median(ps)) %>%
+  mutate(correc = med_ps/(1/nrow(summary_experiment)))
+#observed ps/expected ps
+#with expected ps = 1/13
+
+compo <- compo %>% left_join(summary_experiment[,c("sp", "species_name")]) %>%
+  left_join(compo_ref) %>%
   mutate(ps_ratio = ps/correc)
 
 compo <- compo %>% left_join(
@@ -1479,10 +1504,9 @@ compo <- compo %>% left_join(
   dplyr::select(-sum_ps_ratio)
 ```
 
-Export to Julia
+Export to Julia (for inference)
 
 ```{r export julia sim commu}
-
 for(i in 1:length(M0tot)){
   m0tot <- M0tot[i]
   mat <- compo %>% filter(M0tot == m0tot) %>%
@@ -1491,21 +1515,21 @@ for(i in 1:length(M0tot)){
     dplyr::select(colnames(readsU)) %>% as.matrix()
   # write.csv(mat, paste0("data/sim100_m0tot_", i, ".csv"),row.names = F)
 }
-
-df_targetU2 <- df_targetU %>% left_join(correcU)
-
-ggplot(compo)+
-    geom_boxplot(data = df_targetU2, aes(sp, prop, col = "MU"),
-                 alpha = 0.2)+
-    geom_boxplot(data = df_targetU2, aes(sp, prop/correc, col = "MU_correc"),
-                 alpha = 0.2)+
-  geom_boxplot(aes(sp, ps, col = "sim"), alpha = 0.2)+
-  geom_boxplot(aes(sp, ps/correc, col = "sim_correc"), alpha = 0.2)+
-  facet_wrap(.~M0tot, ncol = 1)+
-  geom_hline(yintercept = 1/13)
+```
 
 
-
+```{r archive}
+# df_targetU2 <- df_targetU %>% left_join(correcU)
+# 
+# ggplot(compo)+
+#     geom_boxplot(data = df_targetU2, aes(sp, prop, col = "MU"),
+#                  alpha = 0.2)+
+#     geom_boxplot(data = df_targetU2, aes(sp, prop/correc, col = "MU_correc"),
+#                  alpha = 0.2)+
+#   geom_boxplot(aes(sp, ps, col = "sim"), alpha = 0.2)+
+#   geom_boxplot(aes(sp, ps/correc, col = "sim_correc"), alpha = 0.2)+
+#   facet_wrap(.~M0tot, ncol = 1)+
+#   geom_hline(yintercept = 1/13)
 ```
 
 Inference results computed in Julia
@@ -1542,12 +1566,11 @@ Supplementary Figure 3
 
 to compare the two approaches
 
-(***ordre des espèces commme dans le papier...)
-
 ```{r figure comparing two approaches}
 
 ggplot(compo)+
-  geom_boxplot(aes(sp, ps_ratio,
+  geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
+                   ps_ratio,
                    group = sp, col = "Ratio"), alpha = 0.1)+
   geom_boxplot(data = res_infer_log, aes(sp, ps_log,
                    group = sp, col = "Logistic model"), alpha = 0.1)+
@@ -1556,7 +1579,7 @@ ggplot(compo)+
                  fill = "Expected\nwithout\nPCR bias"),
              shape = 23,
              size = 3)+
-  facet_wrap(M0tot~., ncol = 1, scales = "free")+
+  facet_wrap(M0tot~., ncol = 1)+
   # scale_color_manual(values = colp)+
   scale_fill_manual(values = colp)+
   labs(x = "Species", y = "Corrected reads proportions",
@@ -1564,11 +1587,13 @@ ggplot(compo)+
   scale_color_brewer(palette = "Set1")+
   ggtitle(TeX("$M_0^{{total}}$")) +
   theme(legend.title = element_text(hjust = 0.5),
-    plot.title = element_text(hjust = 0.5))
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x=element_markdown())+
+  scale_x_discrete(labels = function(x) highlight(x, "Cb|Fe"))
 
-ggsave(filename = "Figures/simu_exp_log.pdf",
-       dpi = 600, units = "mm",
-       width = 150, height = 180, device = "pdf")
+# ggsave(filename = "Figures/simu_exp_log.pdf",
+#        dpi = 600, units = "mm",
+#        width = 150, height = 180, device = "pdf")
 
 ```
 
@@ -1607,11 +1632,14 @@ ggplot(param)+
                    col = "Rca"))+
   geom_vline(xintercept = median(param$K), linetype = "dashed")+
   scale_x_log10()+
-  labs(y = TeX("Efficiencies $\\Lambda_s$"))
+  labs(y = TeX("Efficiencies $\\Lambda_s$"), col = "Species")+
+    theme(
+        legend.title.align=0.5,
+        legend.text.align = 0.5)
 
-# ggsave(filename = "Figures/Lambda_fctK.pdf",
-#        dpi = 600, units = "mm",
-#        width = 150, height = 100, device = "pdf")
+ggsave(filename = "Figures/Lambda_fctK.pdf",
+       dpi = 600, units = "mm",
+       width = 150, height = 100, device = "pdf")
 ```
 
 ###Supplementary Fig 2: hist(K)
@@ -1626,5 +1654,40 @@ ggplot(param)+
 # ggsave(filename = "Figures/histK.pdf",
 #        dpi = 600, units = "mm",
 #        width = 150, height = 100, device = "pdf")
+```
+### Estimation of K from PCR composition
+
+Molar mass of 1 dNTP: $M=327g/mol$ in average
+
+https://www.thermofisher.com/fr/fr/home/references/ambion-tech-support/rna-tools-and-calculators/dna-and-rna-molecular-weights-and-conversions.html
+
+Molar concentration of the 4 dNTP in well: $c_n=1 mM = 1.10^{-3}mol/l$
+
+https://www.thermofisher.com/fr/fr/home/life-science/cloning/cloning-learning-center/invitrogen-school-of-molecular-biology/pcr-education/pcr-reagents-enzymes/pcr-component-considerations.html
+
+Quantity of primers in well: $n_p= 20pmol$/PCR ?
+
+Volume of well: $V = 20 \mu l$
+
+Constant of Avogadro $N_A = 6.02214076\times 10^{23} \: mol^{-1}$
+
+Average length of a sequence: $L=50$ dNTP
+
+Thus, $K=\frac{min(c_n\times V, \: n_p)}{L}\times N_A$
+
+This is the maximum number  of molecules that can be created in a well. Around 1e14.
+
+```{r estimation of K}
+
+c_n = 1e-3 #concentration of nucleotides, mol/l
+Vwell = 20e-6 #volume of a well, l
+N_A = 6.02214076e23 #Avogadro
+L = barcodes$sequence %>% nchar %>% mean
+#mean length of a sequence, number of nucleotides
+
+n_p = 1e-8 #quantity of primers, mol
+
+Ksup = min(c_n*Vwell, n_p)/L*N_A
+Ksup
 ```
 

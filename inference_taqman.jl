@@ -1,5 +1,5 @@
 
-##Inference of initial proportions in metabarcoding data
+##Inference of initial proportions in metabarcoding data from Taqman data
 ##Sylvain Moinard, LECA
 ## 2023
 
@@ -24,11 +24,11 @@
 # Capsella_bursa-pastoris
 # Fraxinus_excelsior
 
-#Change 4 by nspecies+1
+nspecies = 3
 
-reads_dataU = Float64.(Matrix(CSV.read("data/dfSper01U_taq.csv", DataFrame)[:,2:4]))
-reads_dataT = Float64.(Matrix(CSV.read("data/dfSper01T_taq.csv", DataFrame)[:,2:4]))
-reads_dataG = Float64.(Matrix(CSV.read("data/dfSper01G_taq.csv", DataFrame)[:,2:4]))
+reads_dataU = Float64.(Matrix(CSV.read("data/dfSper01U_taq.csv", DataFrame)[:,2:(nspecies+1)]))
+reads_dataT = Float64.(Matrix(CSV.read("data/dfSper01T_taq.csv", DataFrame)[:,2:(nspecies+1)]))
+reads_dataG = Float64.(Matrix(CSV.read("data/dfSper01G_taq.csv", DataFrame)[:,2:(nspecies+1)]))
 
 mean(reads_dataU ./ sum(reads_dataU, dims = 2), dims = 1)
 mean(reads_dataT ./ sum(reads_dataT, dims = 2), dims = 1)
@@ -55,20 +55,20 @@ optU = optim_Qmetabar(reads_dataU, Lambda,
   nsim = nsim)
 
 optU.minimizer ./ sum(optU.minimizer)
-reshape(fill(1, 3) ./ 3, (1,3))
+reshape(fill(1, nspecies) ./ nspecies, (1,nspecies))
 mean(reads_dataU ./ sum(reads_dataU, dims = 2), dims = 1)
 
 inferU = vec(optU.minimizer ./ sum(optU.minimizer))
-vraiU = fill(1, 3) ./ 3
+vraiU = fill(1, nspecies) ./ nspecies
 finU = vec(mean(reads_dataU ./ sum(reads_dataU, dims = 2), dims = 1))
 
 #Aboslute RMSE:
-sqrt(sum((inferU .- vraiU) .^ 2)/3)
-sqrt(sum((finU .- vraiU) .^ 2)/3)
+sqrt(sum((inferU .- vraiU) .^ 2)/nspecies)
+sqrt(sum((finU .- vraiU) .^ 2)/nspecies)
 
 #Relative RMSE:
-sqrt(sum(((inferU .- vraiU) ./ vraiU) .^ 2)/3)
-sqrt(sum(((finU .- vraiU)./ vraiU) .^ 2)/3)
+sqrt(sum(((inferU .- vraiU) ./ vraiU) .^ 2)/nspecies)
+sqrt(sum(((finU .- vraiU)./ vraiU) .^ 2)/nspecies)
 
 ##Exponential model
 prop_exp(reads_dataU, Lambda)
@@ -82,7 +82,7 @@ optT = optim_Qmetabar(reads_dataT, Lambda,
   nsim = nsim)
 
 optT.minimizer ./ sum(optT.minimizer)
-reshape([41, 30, 67] ./ sum([41, 30, 67]), (1,3))
+reshape([41, 30, 67] ./ sum([41, 30, 67]), (1,nspecies))
 mean(reads_dataT ./ sum(reads_dataT, dims = 2), dims = 1)
 
 inferT = vec(optT.minimizer ./ sum(optT.minimizer))
@@ -90,12 +90,12 @@ vraiT = [20, 14, 33] ./ sum([20, 14, 33])
 finT = vec(mean(reads_dataT ./ sum(reads_dataT, dims = 2), dims = 1))
 
 #Absolute RMSE:
-sqrt(sum((inferT .- vraiT) .^ 2)/3)
-sqrt(sum((finT .- vraiT) .^ 2)/3)
+sqrt(sum((inferT .- vraiT) .^ 2)/nspecies)
+sqrt(sum((finT .- vraiT) .^ 2)/nspecies)
 
 #Relative RMSE:
-sqrt(sum(((inferT .- vraiT) ./ vraiT) .^ 2)/3)
-sqrt(sum(((finT .- vraiT)./ vraiT) .^ 2)/3)
+sqrt(sum(((inferT .- vraiT) ./ vraiT) .^ 2)/nspecies)
+sqrt(sum(((finT .- vraiT)./ vraiT) .^ 2)/nspecies)
 
 ##Exponential model
 prop_exp(reads_dataT, Lambda)
@@ -109,7 +109,7 @@ optG = optim_Qmetabar(reads_dataG, Lambda,
   nsim = nsim)
 
 optG.minimizer ./ sum(optG.minimizer)
-reshape([1, 4, 16] ./ 21, (1,3))
+reshape([1, 4, 16] ./ 21, (1,nspecies))
 mean(reads_dataG ./ sum(reads_dataG, dims = 2), dims = 1)
 
 inferG = vec(optG.minimizer ./ sum(optG.minimizer))
@@ -117,12 +117,12 @@ vraiG = [1, 4, 16] ./ 21
 finG = vec(mean(reads_dataG ./ sum(reads_dataG, dims = 2), dims = 1))
 
 #Absolute RMSE:
-sqrt(sum((inferG .- vraiG) .^ 2)/3)
-sqrt(sum((finG .- vraiG) .^ 2)/3)
+sqrt(sum((inferG .- vraiG) .^ 2)/nspecies)
+sqrt(sum((finG .- vraiG) .^ 2)/nspecies)
 
 #Relative RMSE:
-sqrt(sum(((inferG .- vraiG) ./ vraiG) .^ 2)/3)
-sqrt(sum(((finG .- vraiG)./ vraiG) .^ 2)/3)
+sqrt(sum(((inferG .- vraiG) ./ vraiG) .^ 2)/nspecies)
+sqrt(sum(((finG .- vraiG)./ vraiG) .^ 2)/nspecies)
 
 ##Exponential model
 prop_exp(reads_dataT, Lambda)
@@ -145,20 +145,20 @@ optU = optim_Qmetabar(reads_dataU, LambdaA,
   nsim = nsim)
 
 optU.minimizer ./ sum(optU.minimizer)
-reshape(fill(1, 3) ./ 3, (1,3))
+reshape(fill(1, nspecies) ./ nspecies, (1,nspecies))
 mean(reads_dataU ./ sum(reads_dataU, dims = 2), dims = 1)
 
 inferU = vec(optU.minimizer ./ sum(optU.minimizer))
-vraiU = fill(1, 3) ./ 3
+vraiU = fill(1, nspecies) ./ nspecies
 finU = vec(mean(reads_dataU ./ sum(reads_dataU, dims = 2), dims = 1))
 
 #Aboslute RMSE:
-sqrt(sum((inferU .- vraiU) .^ 2)/3)
-sqrt(sum((finU .- vraiU) .^ 2)/3)
+sqrt(sum((inferU .- vraiU) .^ 2)/nspecies)
+sqrt(sum((finU .- vraiU) .^ 2)/nspecies)
 
 #Relative RMSE:
-sqrt(sum(((inferU .- vraiU) ./ vraiU) .^ 2)/3)
-sqrt(sum(((finU .- vraiU)./ vraiU) .^ 2)/3)
+sqrt(sum(((inferU .- vraiU) ./ vraiU) .^ 2)/nspecies)
+sqrt(sum(((finU .- vraiU)./ vraiU) .^ 2)/nspecies)
 
 #_____
 optT = optim_Qmetabar(reads_dataT, LambdaA,
@@ -169,7 +169,7 @@ optT = optim_Qmetabar(reads_dataT, LambdaA,
   nsim = nsim)
 
 optT.minimizer ./ sum(optT.minimizer)
-reshape([41, 30, 67] ./ sum([41, 30, 67]), (1,3))
+reshape([41, 30, 67] ./ sum([41, 30, 67]), (1,nspecies))
 mean(reads_dataT ./ sum(reads_dataT, dims = 2), dims = 1)
 
 inferT = vec(optT.minimizer ./ sum(optT.minimizer))
@@ -177,12 +177,12 @@ vraiT = [41, 30, 67] ./ sum([41, 30, 67])
 finT = vec(mean(reads_dataT ./ sum(reads_dataT, dims = 2), dims = 1))
 
 #Absolute RMSE:
-sqrt(sum((inferT .- vraiT) .^ 2)/3)
-sqrt(sum((finT .- vraiT) .^ 2)/3)
+sqrt(sum((inferT .- vraiT) .^ 2)/nspecies)
+sqrt(sum((finT .- vraiT) .^ 2)/nspecies)
 
 #Relative RMSE:
-sqrt(sum(((inferT .- vraiT) ./ vraiT) .^ 2)/3)
-sqrt(sum(((finT .- vraiT)./ vraiT) .^ 2)/3)
+sqrt(sum(((inferT .- vraiT) ./ vraiT) .^ 2)/nspecies)
+sqrt(sum(((finT .- vraiT)./ vraiT) .^ 2)/nspecies)
 
 #_____
 optG = optim_Qmetabar(reads_dataG, LambdaA,
@@ -193,7 +193,7 @@ optG = optim_Qmetabar(reads_dataG, LambdaA,
   nsim = nsim)
 
 optG.minimizer ./ sum(optG.minimizer)
-reshape([12, 24, 190] ./ sum([12, 24, 190]), (1,3))
+reshape([12, 24, 190] ./ sum([12, 24, 190]), (1,nspecies))
 mean(reads_dataG ./ sum(reads_dataG, dims = 2), dims = 1)
 
 inferG = vec(optG.minimizer ./ sum(optG.minimizer))
@@ -201,12 +201,12 @@ vraiG = [12, 24, 190] ./ sum([12, 24, 190])
 finG = vec(mean(reads_dataG ./ sum(reads_dataG, dims = 2), dims = 1))
 
 #Absolute RMSE:
-sqrt(sum((inferG .- vraiG) .^ 2)/3)
-sqrt(sum((finG .- vraiG) .^ 2)/3)
+sqrt(sum((inferG .- vraiG) .^ 2)/nspecies)
+sqrt(sum((finG .- vraiG) .^ 2)/nspecies)
 
 #Relative RMSE:
-sqrt(sum(((inferG .- vraiG) ./ vraiG) .^ 2)/3)
-sqrt(sum(((finG .- vraiG)./ vraiG) .^ 2)/3)
+sqrt(sum(((inferG .- vraiG) ./ vraiG) .^ 2)/nspecies)
+sqrt(sum(((finG .- vraiG)./ vraiG) .^ 2)/nspecies)
 
 
 ##____________________________________________________________________________________________________
@@ -233,7 +233,7 @@ optU_mec = optim_Qmetabar(reads_dataU, Lambda,
 
 optU_mec.minimizer ./ sum(optU_mec.minimizer)
 optU.minimizer ./ sum(optU.minimizer)
-reshape(fill(1, 3) ./ 3, (1,3))
+reshape(fill(1, nspecies) ./ nspecies, (1,nspecies))
 mean(reads_dataU ./ sum(reads_dataU, dims = 2), dims = 1)
 
 optT_mec = optim_Qmetabar(reads_dataT, Lambda,
@@ -248,7 +248,7 @@ optT_mec = optim_Qmetabar(reads_dataT, Lambda,
 
 optT_mec.minimizer ./ sum(optT_mec.minimizer)
 optT.minimizer ./ sum(optT.minimizer)
-reshape([41, 30, 67] ./ sum([41, 30, 67]), (1,3))
+reshape([41, 30, 67] ./ sum([41, 30, 67]), (1,nspecies))
 mean(reads_dataT ./ sum(reads_dataT, dims = 2), dims = 1)
 
 
@@ -264,7 +264,7 @@ optG_mec = optim_Qmetabar(reads_dataG, Lambda,
 
 optG_mec.minimizer ./ sum(optG_mec.minimizer)
 optG.minimizer ./ sum(optG.minimizer)
-reshape([12, 24, 190] ./ sum([12, 24, 190]), (1,3))
+reshape([12, 24, 190] ./ sum([12, 24, 190]), (1,nspecies))
 mean(reads_dataG ./ sum(reads_dataG, dims = 2), dims = 1)
 
 ##____________________________________________________________________________________________________

@@ -19,7 +19,7 @@ reads_U = Float64.(Matrix(CSV.read("data/reads_U.csv", DataFrame)))
 
 # Initial number of molecules, assayed by ddPCR
 
-qty_init_U = fill(19084., size(reads_U, 2))
+qty_init_U = vec(Float64.(Matrix(CSV.read("data/qty_initU.csv", DataFrame))))
 
 
 ##____________________________________________________________________________________________________
@@ -35,7 +35,7 @@ nsim = 190
 Random.seed!(21011996)
 optU_eff = optim_efficiencies(reads_U, qty_init_U,
   ncycles = 40,
-  ninfer = 101,
+  ninfer = 1,
   nsim = nsim,
   Kmult = 1e13,
   Kmin_log = -3, #log10
