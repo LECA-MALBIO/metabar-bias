@@ -106,7 +106,7 @@ m0totU = K .* sum(vec(psU) ./ (1 .+ Lambda_infer).^neffU)
 m0totT = K .* sum(vec(psT) ./ (1 .+ Lambda_infer).^neffU)
 m0totG = K .* sum(vec(psG) ./ (1 .+ Lambda_infer).^neffU)
 
-optU_full = optim_Qmetabar(reads_U, Lambda_infer,
+optU_full = optim_ps(reads_U, Lambda_infer,
   ninfer = 10,
   randomTheta0 = true,
   previousTheta0 = false,
@@ -122,7 +122,7 @@ std(optU_full.minimizer ./ sum(optU_full.minimizer, dims = 2), dims = 1)
 mean(reads_U ./ sum(reads_U, dims = 2), dims = 1)
 
 
-optT_full = optim_Qmetabar(reads_T, Lambda_infer,
+optT_full = optim_ps(reads_T, Lambda_infer,
   ninfer = 10,
   randomTheta0 = true,
   previousTheta0 = false, 
@@ -140,7 +140,7 @@ std(optT_full.minimizer ./ sum(optT_full.minimizer, dims = 2), dims = 1) ./ mean
 mean(reads_T ./ sum(reads_T, dims = 2), dims = 1)
 
 
-optG_full = optim_Qmetabar(reads_G, Lambda_infer,
+optG_full = optim_ps(reads_G, Lambda_infer,
   ninfer = 10,
   randomTheta0 = true,
   previousTheta0 = false, 
@@ -179,7 +179,7 @@ ps_infer2 = zeros(size(commu2))
 ps_infer3 = zeros(size(commu3))
 
 for sim in 1:size(commu1, 1)
-  opt = optim_Qmetabar(reshape(commu1[sim,:], 1, size(commu1, 2)),
+  opt = optim_ps(reshape(commu1[sim,:], 1, size(commu1, 2)),
   Lambda_infer,
   ninfer = 1,
   randomTheta0 = true,
@@ -197,7 +197,7 @@ mean(commu1, dims = 1)
 mean(ps_infer1, dims = 1)
 
 for sim in 1:size(commu2, 1)
-  opt = optim_Qmetabar(reshape(commu2[sim,:], 1, size(commu2, 2)),
+  opt = optim_ps(reshape(commu2[sim,:], 1, size(commu2, 2)),
   Lambda_infer,
   ninfer = 1,
   randomTheta0 = true,
@@ -214,7 +214,7 @@ mean(commu2, dims = 1)
 mean(ps_infer2, dims = 1)
 
 for sim in 1:size(commu3, 1)
-  opt = optim_Qmetabar(reshape(commu3[sim,:], 1, size(commu3, 2)),
+  opt = optim_ps(reshape(commu3[sim,:], 1, size(commu3, 2)),
   Lambda_infer,
   ninfer = 1,
   randomTheta0 = true,
@@ -298,7 +298,7 @@ mean(reads_U ./ sum(reads_U, dims = 2), dims = 1)
 mean(a ./ sum(a, dims = 2), dims = 1)
 mean(b ./ sum(b, dims = 2), dims = 1)
 
-#J_Qmetabar([1., 1., 1.], rand(190, 1000), reads_data = reads_dataU, Lambda = Lambda, ncycles = 40)
+#J_ps([1., 1., 1.], rand(190, 1000), reads_data = reads_dataU, Lambda = Lambda, ncycles = 40)
 
 println("___")
 println(repl)
@@ -376,7 +376,7 @@ i = 0
 
 for m0tot in (0.5:0.5:5)
   i = i+1
-  optT_full = optim_Qmetabar(reads_T, Lambda_infer,
+  optT_full = optim_ps(reads_T, Lambda_infer,
   ninfer = 10,
   randomTheta0 = true,
   previousTheta0 = false,
@@ -387,7 +387,7 @@ for m0tot in (0.5:0.5:5)
   scoreT[i:(i+9)] = optT_full.minimum
   ps0T[i:(i+9),:] = optT_full.minimizer
 
-  optG_full = optim_Qmetabar(reads_G, Lambda_infer,
+  optG_full = optim_ps(reads_G, Lambda_infer,
   m0tot = m0tot*1e5,
   ncycles = 40,
   K = K,

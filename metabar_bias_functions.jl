@@ -289,7 +289,7 @@ end
 #reads_data: 2D array: Nrow : nreplicates Ncol : reads for each species
 
 
-function J_Qmetabar(Theta,
+function J_ps(Theta,
     quantiles ;
     reads_data = rand(1,1)::Array{Float64, 2},
     Lambda = ones(eltype(Theta), length(Theta)),
@@ -358,7 +358,7 @@ end
 #Ncol = nspecies * (ncycles+2)
 #first column : initial randomness, then each cycle then sequencing
 
-function optim_Qmetabar(reads_data::Array{Float64, 2}, Lambda::Array{Float64, 1};
+function optim_ps(reads_data::Array{Float64, 2}, Lambda::Array{Float64, 1};
     m0tot = 1e5::Float64,
     ncycles = 40::Int64,
     K = 1e11::Float64,
@@ -373,7 +373,9 @@ function optim_Qmetabar(reads_data::Array{Float64, 2}, Lambda::Array{Float64, 1}
     dispersion = 1.::Float64,
     model = "logistic",
     c = 1., #mechanistic model, not shown in paper
-    e = 1.) #mechanistic model, not shown in paper
+    e = 1., #mechanistic model, not shown in paper
+    show_trace = true,
+    show_every = 10) 
   
     #reads_data: 2D array. Rows = replicates, Col = species
   
@@ -387,7 +389,7 @@ function optim_Qmetabar(reads_data::Array{Float64, 2}, Lambda::Array{Float64, 1}
     if (isnothing(Theta0))
       Theta0 = pdata
     end
-    obj = (Theta, quantiles) -> J_Qmetabar(Theta, quantiles,
+    obj = (Theta, quantiles) -> J_ps(Theta, quantiles,
                                           reads_data = reads_data,
                                           Lambda = Lambda,
                                           K = K,
@@ -412,8 +414,8 @@ function optim_Qmetabar(reads_data::Array{Float64, 2}, Lambda::Array{Float64, 1}
                        gtol = gtol,
                        xtol = xtol,
                        maxit = maxit,
-                       show_trace = true,
-                       show_every = 10)
+                       show_trace = show_trace,
+                       show_every = show_every)
       return opt
   end
   
@@ -511,7 +513,7 @@ function simu_pcr_normalQ_eff(Theta,
   return kinetics .* n_reads ./ sum(kinetics, dims = 2)
 end
 
-
+#Cost function to minimize to find optimal lambda_s and K
 function J_efficiencies(Theta,
     quantiles ;
     reads_data = rand(1,1)::Array{Float64, 2},
@@ -523,13 +525,23 @@ function J_efficiencies(Theta,
     c = 1.,
     e = 1.,
     lambda_max = 1.,
-    Kmult = 1e12)
+    Kmult = 1e14,
+    Kfixed = false)
 
     #One should choose nsim = k * nreplicate, k integer
-  K = 10^Theta[length(Theta)]*Kmult #log10(K) stored in Theta
-  if !isnothing(lambda_max)
-    Theta = vcat(lambda_max, vec(Theta[1:(length(Theta)-1)])) #most abundant species in first position !!!
-  end
+    if Kfixed
+      K = Kmult
+      if !isnothing(lambda_max)
+        Theta = vcat(lambda_max, Theta) #most abundant species in first position !!!
+      end
+    else
+      K = 10^Theta[length(Theta)]*Kmult #log10(K) stored in Theta
+      if !isnothing(lambda_max)
+        Theta = vcat(lambda_max, vec(Theta[1:(length(Theta)-1)])) #most abundant species in first position !!!
+      end
+    end
+
+
   
 
   nsim = size(quantiles, 1) #number of simulations to perform by flimo
@@ -594,6 +606,8 @@ function J_efficiencies(Theta,
   return score
 end
 
+
+
 #Inference function to get the PCR efficiencies Lambda_s and K
 function optim_efficiencies(reads_data::Array{Float64, 2}, m0::Array{Float64, 1};
     ncycles = 40::Int64,
@@ -609,9 +623,12 @@ function optim_efficiencies(reads_data::Array{Float64, 2}, m0::Array{Float64, 1}
     e = 1.,
     lambda_max = 1.,
     quantiles = nothing,
+    Kfixed = false,
+    K = 1e14,
     Kmin_log = -2,
     Kmax_log = 2,
-    Kmult = 1e12)
+    show_trace = true,
+    show_every = 10)
   
     #reads_data: 2D array. Rows = replicates, Col = species
     nspecies = size(reads_data, 2)
@@ -620,39 +637,60 @@ function optim_efficiencies(reads_data::Array{Float64, 2}, m0::Array{Float64, 1}
     n_reads_repli = sum(reads_data, dims = 2)
   
     #pdata = vec(mean(reads_data ./ sum(reads_data, dims = 2), dims = 1)) #average species proportions in data
-    if (isnothing(Theta0))
-      Theta0 = vcat(fill(lambda_max*0.999, nspecies-1), 0.) #log10(K)
+    if Kfixed
+      if (isnothing(Theta0))
+        Theta0 = fill(lambda_max*0.999, nspecies-1)
+      end
+        theta_lower = fill(0.5, nspecies-1)
+        theta_upper = fill(lambda_max*0.9999, nspecies-1)
+    else  
+      if (isnothing(Theta0))
+        Theta0 = vcat(fill(lambda_max*0.999, nspecies-1), 0.) #log10(K)
+      end
+        theta_lower = vcat(fill(0.5, nspecies-1), Kmin_log)
+        theta_upper = vcat(fill(lambda_max*0.9999, nspecies-1), Kmax_log)
     end
+
     obj = (Theta, quantiles) -> J_efficiencies(Theta, quantiles,
-                                          reads_data = reads_data,
-                                          m0 = m0,
-                                          n_reads = n_reads_repli,
-                                          ncycles = ncycles,
-                                          dispersion = dispersion,
-                                          model = model,
-                                          c = c,
-                                          e = e,
-                                          lambda_max = lambda_max,
-                                          Kmult = Kmult)
-    
+      reads_data = reads_data,
+      m0 = m0,
+      n_reads = n_reads_repli,
+      ncycles = ncycles,
+      dispersion = dispersion,
+      model = model,
+      c = c,
+      e = e,
+      lambda_max = lambda_max,
+      Kfixed = Kfixed,
+      Kmult = K)
+
     opt = Jflimo.flimoptim(nspecies*(ncycles+2),
                        obj = obj,
                        nsim = nsim,
                        ninfer = ninfer,
-                       lower = vcat(fill(0.5, nspecies-1), Kmin_log),
-                       upper = vcat(fill(lambda_max*0.9999, nspecies-1), Kmax_log),
+                       lower = theta_lower,
+                       upper = theta_upper,
                        AD = true,
                        randomTheta0 = true,
                        previousTheta0 = false,
                        gtol = gtol,
                        xtol = xtol,
                        maxit = maxit,
-                       show_trace = true,
-                       show_every = 10,
+                       show_trace = show_trace,
+                       show_every = show_every,
                        quantiles = quantiles)
       return opt
   end
 
+##____________________________________________________________________________________________________
+## RMSE computation
 
+function AbsErr(ps_observed, ps_expected)
+  sqrt(sum((ps_observed .- ps_expected).^2) / length(ps_expected))
+end
+
+function RelErr(ps_observed, ps_expected)
+  sqrt(sum(((ps_observed .- ps_expected) ./ ps_expected).^2) / length(ps_expected))
+end
 
   #TO DO 14/11/2023 : implement quantile multinomial (with cumsum)

@@ -47,7 +47,7 @@ K = 7.57e12
 nsim = 1900
 
 #_____
-optU = optim_Qmetabar(reads_dataU, Lambda,
+optU = optim_ps(reads_dataU, Lambda,
   m0tot = 1e5,
   ncycles = 40,
   K = K,
@@ -74,7 +74,7 @@ sqrt(sum(((finU .- vraiU)./ vraiU) .^ 2)/nspecies)
 prop_exp(reads_dataU, Lambda)
 
 #_____
-optT = optim_Qmetabar(reads_dataT, Lambda,
+optT = optim_ps(reads_dataT, Lambda,
   m0tot = 1e5,
   ncycles = 40,
   K = K,
@@ -101,7 +101,7 @@ sqrt(sum(((finT .- vraiT)./ vraiT) .^ 2)/nspecies)
 prop_exp(reads_dataT, Lambda)
 
 #_____
-optG = optim_Qmetabar(reads_dataG, Lambda,
+optG = optim_ps(reads_dataG, Lambda,
   m0tot = 2.5e5,
   ncycles = 40,
   K = K,
@@ -137,7 +137,7 @@ LambdaB = [0.947, 0.989, 0.940]
 #Change LambdaA to LambdaB to compare
 
 #_____
-optU = optim_Qmetabar(reads_dataU, LambdaA,
+optU = optim_ps(reads_dataU, LambdaA,
   m0tot = 1e5,
   ncycles = 40,
   K = K,
@@ -161,7 +161,7 @@ sqrt(sum(((inferU .- vraiU) ./ vraiU) .^ 2)/nspecies)
 sqrt(sum(((finU .- vraiU)./ vraiU) .^ 2)/nspecies)
 
 #_____
-optT = optim_Qmetabar(reads_dataT, LambdaA,
+optT = optim_ps(reads_dataT, LambdaA,
   m0tot = 1e5,
   ncycles = 40,
   K = K,
@@ -185,7 +185,7 @@ sqrt(sum(((inferT .- vraiT) ./ vraiT) .^ 2)/nspecies)
 sqrt(sum(((finT .- vraiT)./ vraiT) .^ 2)/nspecies)
 
 #_____
-optG = optim_Qmetabar(reads_dataG, LambdaA,
+optG = optim_ps(reads_dataG, LambdaA,
   m0tot = 1e5,
   ncycles = 40,
   K = K,
@@ -211,7 +211,7 @@ sqrt(sum(((finG .- vraiG)./ vraiG) .^ 2)/nspecies)
 
 ##____________________________________________________________________________________________________
 #Check type stability
-@code_warntype optim_Qmetabar(reads_dataU, Lambda,
+@code_warntype optim_ps(reads_dataU, Lambda,
     m0tot = 1e5,
     ncycles = 40,
     K = 1e11,
@@ -221,7 +221,7 @@ sqrt(sum(((finG .- vraiG)./ vraiG) .^ 2)/nspecies)
 ##____________________________________________________________________________________________________
 # Mechanistic model
 
-optU_mec = optim_Qmetabar(reads_dataU, Lambda,
+optU_mec = optim_ps(reads_dataU, Lambda,
   m0tot = 1e5,
   ncycles = 40,
   K = K,
@@ -236,7 +236,7 @@ optU.minimizer ./ sum(optU.minimizer)
 reshape(fill(1, nspecies) ./ nspecies, (1,nspecies))
 mean(reads_dataU ./ sum(reads_dataU, dims = 2), dims = 1)
 
-optT_mec = optim_Qmetabar(reads_dataT, Lambda,
+optT_mec = optim_ps(reads_dataT, Lambda,
   m0tot = 1e5,
   ncycles = 40,
   K = K,
@@ -252,7 +252,7 @@ reshape([41, 30, 67] ./ sum([41, 30, 67]), (1,nspecies))
 mean(reads_dataT ./ sum(reads_dataT, dims = 2), dims = 1)
 
 
-optG_mec = optim_Qmetabar(reads_dataG, Lambda,
+optG_mec = optim_ps(reads_dataG, Lambda,
   m0tot = 1e5,
   ncycles = 40,
   K = K,
@@ -278,7 +278,7 @@ reads_dataG_complete = Float64.(Matrix(CSV.read("data/dfSper01G_taq_complete.csv
 
 
 #_____
-optU_complete = optim_Qmetabar(reads_dataU_complete, Lambda_complete,
+optU_complete = optim_ps(reads_dataU_complete, Lambda_complete,
   m0tot = 1e5,
   ncycles = 40,
   K = K,
@@ -307,7 +307,7 @@ sqrt(sum(((inferU .- vraiU) ./ vraiU) .^ 2)/3)
 sqrt(sum(((finU .- vraiU)./ vraiU) .^ 2)/3)
 
 #_____
-optT_complete = optim_Qmetabar(reads_dataT_complete, Lambda_complete,
+optT_complete = optim_ps(reads_dataT_complete, Lambda_complete,
   m0tot = 2e5,
   ncycles = 20,
   K = K/7,
@@ -333,7 +333,7 @@ sqrt(sum(((inferT .- vraiT) ./ vraiT) .^ 2)/3)
 sqrt(sum(((finT .- vraiT)./ vraiT) .^ 2)/3)
 
 #_____
-optG_complete = optim_Qmetabar(reads_dataG_complete, Lambda_complete,
+optG_complete = optim_ps(reads_dataG_complete, Lambda_complete,
   m0tot = 1e5,
   ncycles = 40,
   K = K,
@@ -368,8 +368,8 @@ x./ sum(x)
 
 optU.minimum
 
-J_Qmetabar([1., 1., 1.], rand(190, 1000), reads_data = reads_dataU, Lambda = Lambda, ncycles = 40)
-J_Qmetabar(optU.minimizer, rand(190, 1000), reads_data = reads_dataU, Lambda = Lambda, ncycles = 40)
+J_ps([1., 1., 1.], rand(190, 1000), reads_data = reads_dataU, Lambda = Lambda, ncycles = 40)
+J_ps(optU.minimizer, rand(190, 1000), reads_data = reads_dataU, Lambda = Lambda, ncycles = 40)
 
 
 sim = simu_pcr_normalQ(1e5 .* [1., 1., 1.], rand(1, 1000) ; Lambda = Lambda, n_reads = 5e4)
