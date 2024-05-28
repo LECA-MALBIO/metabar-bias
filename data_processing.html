@@ -409,7 +409,7 @@ analyses.</p>
 <p>Salvia pratensis has a different barcode as in the database (one
 insertion)</p>
 <pre class="r"><code>#Open file with barcodes:
-barcodes &lt;- read_excel(&quot;data/new_plant_positive_control.xlsx&quot;)[,c(2,4:6)]</code></pre>
+barcodes &lt;- read_excel(&quot;data/plantes_info/new_plant_positive_control.xlsx&quot;)[,c(2,4:6)]</code></pre>
 <pre><code>## New names:
 ## • `` -&gt; `...1`</code></pre>
 <pre class="r"><code>names(barcodes) &lt;- c(&quot;species_name&quot;, &quot;sequence&quot;, &quot;length&quot;, &quot;gc_content&quot;)
@@ -426,7 +426,7 @@ barcodes &lt;- barcodes %&gt;% filter(species_name != &quot;Rumex_acetosa&quot;)
 <p>The extraction file contains total DNA concentration assayed by
 Qubit</p>
 <pre class="r"><code>#Open/Process extraction file:
-extraction &lt;- read_excel(&quot;data/dosage extraction plantes.xlsx&quot;)</code></pre>
+extraction &lt;- read_excel(&quot;data/data_extraction/dosage extraction plantes.xlsx&quot;)</code></pre>
 <pre><code>## New names:
 ## • `Masse extrait (mg)` -&gt; `Masse extrait (mg)...4`
 ## • `Masse extrait (mg)` -&gt; `Masse extrait (mg)...6`
@@ -438,14 +438,14 @@ extraction &lt;- extraction %&gt;% dplyr::select(Espece,
   rename(CDNA_sample = `concentration (ng/µl`,
          species_name = Espece)
 
-# write.csv(extraction, &quot;data/extraction.csv&quot;, row.names = F)</code></pre>
+# write.csv(extraction, &quot;data/data_extraction/extraction.csv&quot;, row.names = F)</code></pre>
 </div>
 <div id="ddpcr-data" class="section level3">
 <h3>ddPCR data</h3>
 <p>Open, clean, summarise ddPCR data (output of the Quantasoft Software
 by Biorad)</p>
 <pre class="r"><code>#First file (Quantasoft)
-dataddpcr1 &lt;- read.csv(&quot;data/QMETABAR_MOINARD1204_manual.csv&quot;,
+dataddpcr1 &lt;- read.csv(&quot;data/data_ddpcr/QMETABAR_MOINARD1204_manual.csv&quot;,
                        header=FALSE)
 
 #Process file
@@ -535,7 +535,7 @@ dataddpcr1[dataddpcr1$Status == &quot;CHECK&quot;,]$Concentration &lt;-
         dataddpcr1[dataddpcr1$Status == &quot;CHECK&quot;,]$Negatives)/vdroplet
 
 #Second file (Quantasoft)
-dataddpcr2 &lt;- read.csv(&quot;data/QMETABAR_MOINARD_140422_manual.csv&quot;,
+dataddpcr2 &lt;- read.csv(&quot;data/data_ddpcr/QMETABAR_MOINARD_140422_manual.csv&quot;,
                         header=FALSE)
 #Process file
 colnames(dataddpcr2) &lt;- dataddpcr2[1,]
@@ -624,7 +624,7 @@ dataddpcr &lt;- dataddpcr %&gt;%
   mutate(Concentration_copies_ng = Concentration/TotalDNA) %&gt;%
   filter(Used &amp; Sample &lt; 100) #Keep only replicates used in this study
 
-# write_csv(dataddpcr, &quot;data/dataddpcr.csv&quot;)
+# write_csv(dataddpcr, &quot;data/data_ddpcr/dataddpcr.csv&quot;)
 
 summary_dd &lt;- dataddpcr %&gt;% filter(Used &amp; Sample &lt; 100) %&gt;%
   group_by(Sample) %&gt;%
@@ -637,6 +637,7 @@ summary_dd &lt;- dataddpcr %&gt;% filter(Used &amp; Sample &lt; 100) %&gt;%
 </div>
 <div id="metabarcoding-data-processing" class="section level3">
 <h3>Metabarcoding data processing</h3>
+<p>Folder data/data_metabarcoding</p>
 <p>Processing the data with OBITools version 4 (<a href="https://git.metabarcoding.org/obitools/obitools4/obitools4" class="uri">https://git.metabarcoding.org/obitools/obitools4/obitools4</a>)</p>
 <p>Three communities: * L1 (library 1746) = uniform in Total DNA
 (renamed T in the paper) * G1 (library 1748) = Geometric * U1 (library
@@ -724,7 +725,7 @@ GWM_Sper01.grep 28371 / 10202369 % gobicount GWM_Sper01.clean 28371 /
 <p>Data come from a larger experiment. Every replicate containing
 “Spike” molecules is removed.</p>
 <p>Preparing dataframe:</p>
-<pre class="r"><code>data_Sper01 &lt;- read_obifasta(&quot;data/GWM_Sper01.clean&quot;)
+<pre class="r"><code>data_Sper01 &lt;- read_obifasta(&quot;data/data_metabarcoding/GWM_Sper01.clean&quot;)
 
 weights &lt;- extract_readcount(data_Sper01,
                     key = &quot;obiclean_weight&quot;)</code></pre>
@@ -788,7 +789,7 @@ df_Sper01 &lt;- df_Sper01 %&gt;% left_join(summary_sample[,1:2]) %&gt;%
 <pre class="r"><code>df_Sper01[is.na(df_Sper01$species_name),&quot;species_name&quot;] &lt;- as.character(df_Sper01[is.na(df_Sper01$species_name),]$seq_rank)
 
 #Output:
-# write_csv(df_Sper01, &quot;data/df_Sper01.csv&quot;)</code></pre>
+# write_csv(df_Sper01, &quot;data/data_metabarcoding/df_Sper01.csv&quot;)</code></pre>
 <div id="contamination-check" class="section level4">
 <h4>Contamination check</h4>
 <pre class="r"><code>df_Sper01 %&gt;% filter(NegControl) %&gt;%
@@ -803,42 +804,6 @@ df_Sper01 &lt;- df_Sper01 %&gt;% left_join(summary_sample[,1:2]) %&gt;%
 <pre class="r"><code># df_Sper01 %&gt;% filter(Sample == &quot;PCRNeg_G1_R1&quot;) %&gt;% arrange(-reads) #%&gt;% View
 # df_Sper01 %&gt;% filter(Sample == &quot;PCRNeg_L1_R1&quot;) %&gt;% arrange(-reads) #%&gt;% View
 # df_Sper01 %&gt;% filter(Sample == &quot;PCRNeg_U1_R1&quot;) %&gt;% arrange(-reads) #%&gt;% View</code></pre>
-<p>Open data before filtering (grep, clean)</p>
-<pre class="r"><code># data_Sper01_prev &lt;- read_obifasta(&quot;data/GWM_Sper01.uniq&quot;)
-# 
-# reads &lt;- extract_readcount(data_Sper01_prev)
-# df_reads &lt;- Matrix::summary(reads)
-# df_reads &lt;- data.frame(Sample = rownames(reads)[df_reads$i],
-#            id = colnames(reads)[df_reads$j],
-#            reads = df_reads$x)
-# 
-# df_Sper01 &lt;- Matrix::summary(reads) #&quot;pivot longer&quot;
-# 
-# df_Sper01 &lt;- df_reads %&gt;%
-#   left_join(data_Sper01_prev %&gt;% dplyr::select(id, sequence)) %&gt;%
-#   mutate(Community = substr(Sample, 1, 1),
-#          NegControl = Community == &quot;P&quot;)
-# 
-# df_Sper01[df_Sper01$Community == &quot;P&quot;, &quot;Community&quot;] &lt;- substr(df_Sper01[df_Sper01$Community == &quot;P&quot;,]$Sample, 8, 8)
-# df_Sper01[df_Sper01$Community == &quot;L&quot;, &quot;Community&quot;] &lt;- &quot;T&quot;
-# 
-# df_Sper01$Spike_level &lt;- NA
-# df_Sper01[!df_Sper01$NegControl,&quot;Spike_level&quot;] &lt;- as.numeric(substr(df_Sper01[!df_Sper01$NegControl,]$Sample, 4, 4))
-# 
-# df_Sper01[df_Sper01$NegControl,&quot;Spike_level&quot;] &lt;- as.numeric(substr(df_Sper01[df_Sper01$NegControl,]$Sample, 12, 12))
-# 
-# df_Sper01 &lt;- df_Sper01 %&gt;% filter(Spike_level == 1)
-# 
-# summary_sample &lt;- df_Sper01 %&gt;%
-#   group_by(Sample) %&gt;%
-#   summarise(total_count_sample = sum(reads),
-#             NegControl = NegControl[1],
-#             Spike_level = Spike_level[1],
-#             Community = Community[1]) %&gt;%
-#   arrange(total_count_sample)
-# 
-# summary_sample %&gt;% filter(!NegControl) %&gt;%
-#   pull(total_count_sample) %&gt;% summary</code></pre>
 <p>Exports data to Julia for Taqman analysis</p>
 <pre class="r"><code>reads_threshold &lt;- 5000
 
@@ -858,7 +823,7 @@ auxU &lt;- df_Sper01 %&gt;%
 
 #Matrix:
 matU &lt;- as.matrix(auxU[,-1])
-# write.csv(matU, &quot;data/dfSper01U_taq.csv&quot;)
+# write.csv(matU, &quot;data/export_to_julia/dfSper01U_taq.csv&quot;)
 
 ##Community T
 auxT &lt;- df_Sper01 %&gt;%
@@ -876,7 +841,7 @@ auxT &lt;- df_Sper01 %&gt;%
 
 #Matrix
 matT &lt;- as.matrix(auxT[,-1])
-# write.csv(matT, &quot;data/dfSper01T_taq.csv&quot;)
+# write.csv(matT, &quot;data/export_to_julia/dfSper01T_taq.csv&quot;)
 
 ##Community G
 auxG &lt;- df_Sper01 %&gt;%
@@ -894,7 +859,7 @@ auxG &lt;- df_Sper01 %&gt;%
 
 #Matrix:
 matG &lt;- as.matrix(auxG[,-1])
-# write.csv(matG, &quot;data/dfSper01G_taq.csv&quot;)</code></pre>
+# write.csv(matG, &quot;data/export_to_julia/dfSper01G_taq.csv&quot;)</code></pre>
 </div>
 </div>
 </div>
@@ -970,16 +935,16 @@ taqman5$CDNA_well &lt;- taqman4$CDNA_well/5
 #Export Taqman prior data
 taqman &lt;- rbind(taqman1, taqman2, taqman3, taqman4, taqman5)
 taqman[taqman$sp == &quot;Fe&quot;,&quot;sp&quot;] &lt;- &quot;Fex&quot;
-# write_csv(taqman, &quot;data/taqman.csv&quot;)</code></pre>
+# write_csv(taqman, &quot;data/data_qpcr_taqman/taqman.csv&quot;)</code></pre>
 </div>
 <div id="process-results" class="section level3">
 <h3>Process results</h3>
-<pre class="r"><code>endpoint &lt;- read.csv2(&quot;data/SPER01_End_Point_res.csv&quot;)
+<pre class="r"><code>endpoint &lt;- read.csv2(&quot;data/data_qpcr_taqman/SPER01_End_Point_res.csv&quot;)
 endpoint &lt;- endpoint[,c(&quot;Well&quot;, &quot;End.RFU&quot;)]
 
-ampli &lt;- read.csv2(&quot;data/SPER01_ampli_res.csv&quot;)[,-1]
+ampli &lt;- read.csv2(&quot;data/data_qpcr_taqman/SPER01_ampli_res.csv&quot;)[,-1]
 
-cq &lt;- read.csv2(&quot;data/SPER01_Cq_res.csv&quot;)
+cq &lt;- read.csv2(&quot;data/data_qpcr_taqman/SPER01_Cq_res.csv&quot;)
 cq &lt;- cq[cq$Fluor == &quot;FAM&quot;,c(&quot;Well&quot;, &quot;Cq&quot;)]
 
 
@@ -1026,10 +991,10 @@ res_taqman &lt;- res_taqman %&gt;%
   left_join(taqman,
             by = c(&quot;sp&quot; = &quot;sp&quot;, &quot;Dilu&quot; = &quot;mix&quot;))
 
-# write.csv(res_taqman %&gt;% filter(!Neg), &quot;data/res_taqman.csv&quot;,
+# write.csv(res_taqman %&gt;% filter(!Neg), &quot;data/data_qpcr_taqman/res_taqman.csv&quot;,
 #           row.names = F)
 
-# write.csv(kinetics %&gt;% filter(!Neg), &quot;data/taqman_kinetics.csv&quot;,
+# write.csv(kinetics %&gt;% filter(!Neg), &quot;data/data_qpcr_taqman/taqman_kinetics.csv&quot;,
 #           row.names = F)</code></pre>
 </div>
 </div>
@@ -1037,12 +1002,12 @@ res_taqman &lt;- res_taqman %&gt;%
 <h2>Tags for metabarcoding PCR</h2>
 <p>Open file to check tags</p>
 <pre class="r"><code>#Forward
-primers1 &lt;- read.table(&quot;data/DEL0455463409_bis.csv&quot;,
+primers1 &lt;- read.table(&quot;data/data_metabarcoding/DEL0455463409_bis.csv&quot;,
                        header = T, sep = &quot;,&quot;, na.strings = c(&quot;N/A&quot;, &quot;-&quot;))
 primers1 &lt;- primers1[,-which(is.na(primers1[1,]))]
 
 #Reverse
-primers2 &lt;- read.table(&quot;data/DEL0455483280_bis.csv&quot;,
+primers2 &lt;- read.table(&quot;data/data_metabarcoding/DEL0455483280_bis.csv&quot;,
                        header = T, sep = &quot;,&quot;, na.strings = c(&quot;N/A&quot;, &quot;-&quot;))
 primers2 &lt;- primers2[,-which(is.na(primers2[1,]))]
 

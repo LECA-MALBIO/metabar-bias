@@ -56,7 +56,7 @@ Salvia pratensis has a different barcode as in the database (one insertion)
 
 ```{r open barcodes reference}
 #Open file with barcodes:
-barcodes <- read_excel("data/new_plant_positive_control.xlsx")[,c(2,4:6)]
+barcodes <- read_excel("data/plantes_info/new_plant_positive_control.xlsx")[,c(2,4:6)]
 
 names(barcodes) <- c("species_name", "sequence", "length", "gc_content")
 
@@ -75,7 +75,7 @@ The extraction file contains total DNA concentration assayed by Qubit
 
 ```{r extraction}
 #Open/Process extraction file:
-extraction <- read_excel("data/dosage extraction plantes.xlsx")
+extraction <- read_excel("data/data_extraction/dosage extraction plantes.xlsx")
 extraction <- extraction[-nrow(extraction),]
 extraction <- extraction %>% dplyr::select(Espece,
                                            Sample,
@@ -83,7 +83,7 @@ extraction <- extraction %>% dplyr::select(Espece,
   rename(CDNA_sample = `concentration (ng/µl`,
          species_name = Espece)
 
-# write.csv(extraction, "data/extraction.csv", row.names = F)
+# write.csv(extraction, "data/data_extraction/extraction.csv", row.names = F)
 ```
 
 ### ddPCR data
@@ -92,7 +92,7 @@ Open, clean, summarise ddPCR data (output of the Quantasoft Software by Biorad)
 
 ```{r ddPCR data}
 #First file (Quantasoft)
-dataddpcr1 <- read.csv("data/QMETABAR_MOINARD1204_manual.csv",
+dataddpcr1 <- read.csv("data/data_ddpcr/QMETABAR_MOINARD1204_manual.csv",
                        header=FALSE)
 
 #Process file
@@ -181,7 +181,7 @@ dataddpcr1[dataddpcr1$Status == "CHECK",]$Concentration <-
         dataddpcr1[dataddpcr1$Status == "CHECK",]$Negatives)/vdroplet
 
 #Second file (Quantasoft)
-dataddpcr2 <- read.csv("data/QMETABAR_MOINARD_140422_manual.csv",
+dataddpcr2 <- read.csv("data/data_ddpcr/QMETABAR_MOINARD_140422_manual.csv",
                         header=FALSE)
 #Process file
 colnames(dataddpcr2) <- dataddpcr2[1,]
@@ -269,7 +269,7 @@ dataddpcr <- dataddpcr %>%
   mutate(Concentration_copies_ng = Concentration/TotalDNA) %>%
   filter(Used & Sample < 100) #Keep only replicates used in this study
 
-# write_csv(dataddpcr, "data/dataddpcr.csv")
+# write_csv(dataddpcr, "data/data_ddpcr/dataddpcr.csv")
 
 summary_dd <- dataddpcr %>% filter(Used & Sample < 100) %>%
   group_by(Sample) %>%
@@ -282,6 +282,8 @@ summary_dd <- dataddpcr %>% filter(Used & Sample < 100) %>%
 ```
 
 ### Metabarcoding data processing
+
+Folder data/data_metabarcoding
 
 Processing the data with OBITools version 4
 (https://git.metabarcoding.org/obitools/obitools4/obitools4)
@@ -396,7 +398,7 @@ Data come from a larger experiment. Every replicate containing "Spike" molecules
 Preparing dataframe:
 
 ```{r open metabarcoding data}
-data_Sper01 <- read_obifasta("data/GWM_Sper01.clean")
+data_Sper01 <- read_obifasta("data/data_metabarcoding/GWM_Sper01.clean")
 
 weights <- extract_readcount(data_Sper01,
                     key = "obiclean_weight")
@@ -455,7 +457,7 @@ df_Sper01 <- df_Sper01 %>% left_join(summary_sample[,1:2]) %>%
 df_Sper01[is.na(df_Sper01$species_name),"species_name"] <- as.character(df_Sper01[is.na(df_Sper01$species_name),]$seq_rank)
 
 #Output:
-# write_csv(df_Sper01, "data/df_Sper01.csv")
+# write_csv(df_Sper01, "data/data_metabarcoding/df_Sper01.csv")
 
 ```
 
@@ -469,47 +471,6 @@ df_Sper01 %>% filter(NegControl) %>%
 # df_Sper01 %>% filter(Sample == "PCRNeg_G1_R1") %>% arrange(-reads) #%>% View
 # df_Sper01 %>% filter(Sample == "PCRNeg_L1_R1") %>% arrange(-reads) #%>% View
 # df_Sper01 %>% filter(Sample == "PCRNeg_U1_R1") %>% arrange(-reads) #%>% View
-```
-
-Open data before filtering (grep, clean)
-
-```{r data before filtering}
-# data_Sper01_prev <- read_obifasta("data/GWM_Sper01.uniq")
-# 
-# reads <- extract_readcount(data_Sper01_prev)
-# df_reads <- Matrix::summary(reads)
-# df_reads <- data.frame(Sample = rownames(reads)[df_reads$i],
-#            id = colnames(reads)[df_reads$j],
-#            reads = df_reads$x)
-# 
-# df_Sper01 <- Matrix::summary(reads) #"pivot longer"
-# 
-# df_Sper01 <- df_reads %>%
-#   left_join(data_Sper01_prev %>% dplyr::select(id, sequence)) %>%
-#   mutate(Community = substr(Sample, 1, 1),
-#          NegControl = Community == "P")
-# 
-# df_Sper01[df_Sper01$Community == "P", "Community"] <- substr(df_Sper01[df_Sper01$Community == "P",]$Sample, 8, 8)
-# df_Sper01[df_Sper01$Community == "L", "Community"] <- "T"
-# 
-# df_Sper01$Spike_level <- NA
-# df_Sper01[!df_Sper01$NegControl,"Spike_level"] <- as.numeric(substr(df_Sper01[!df_Sper01$NegControl,]$Sample, 4, 4))
-# 
-# df_Sper01[df_Sper01$NegControl,"Spike_level"] <- as.numeric(substr(df_Sper01[df_Sper01$NegControl,]$Sample, 12, 12))
-# 
-# df_Sper01 <- df_Sper01 %>% filter(Spike_level == 1)
-# 
-# summary_sample <- df_Sper01 %>%
-#   group_by(Sample) %>%
-#   summarise(total_count_sample = sum(reads),
-#             NegControl = NegControl[1],
-#             Spike_level = Spike_level[1],
-#             Community = Community[1]) %>%
-#   arrange(total_count_sample)
-# 
-# summary_sample %>% filter(!NegControl) %>%
-#   pull(total_count_sample) %>% summary
-
 ```
 
 Exports data to Julia for Taqman analysis
@@ -533,7 +494,7 @@ auxU <- df_Sper01 %>%
 
 #Matrix:
 matU <- as.matrix(auxU[,-1])
-# write.csv(matU, "data/dfSper01U_taq.csv")
+# write.csv(matU, "data/export_to_julia/dfSper01U_taq.csv")
 
 ##Community T
 auxT <- df_Sper01 %>%
@@ -551,7 +512,7 @@ auxT <- df_Sper01 %>%
 
 #Matrix
 matT <- as.matrix(auxT[,-1])
-# write.csv(matT, "data/dfSper01T_taq.csv")
+# write.csv(matT, "data/export_to_julia/dfSper01T_taq.csv")
 
 ##Community G
 auxG <- df_Sper01 %>%
@@ -569,7 +530,7 @@ auxG <- df_Sper01 %>%
 
 #Matrix:
 matG <- as.matrix(auxG[,-1])
-# write.csv(matG, "data/dfSper01G_taq.csv")
+# write.csv(matG, "data/export_to_julia/dfSper01G_taq.csv")
 ```
 
 ## Taqman qPCR
@@ -645,18 +606,18 @@ taqman5$CDNA_well <- taqman4$CDNA_well/5
 #Export Taqman prior data
 taqman <- rbind(taqman1, taqman2, taqman3, taqman4, taqman5)
 taqman[taqman$sp == "Fe","sp"] <- "Fex"
-# write_csv(taqman, "data/taqman.csv")
+# write_csv(taqman, "data/data_qpcr_taqman/taqman.csv")
 ```
 
 ### Process results
 
 ```{r taqman results}
-endpoint <- read.csv2("data/SPER01_End_Point_res.csv")
+endpoint <- read.csv2("data/data_qpcr_taqman/SPER01_End_Point_res.csv")
 endpoint <- endpoint[,c("Well", "End.RFU")]
 
-ampli <- read.csv2("data/SPER01_ampli_res.csv")[,-1]
+ampli <- read.csv2("data/data_qpcr_taqman/SPER01_ampli_res.csv")[,-1]
 
-cq <- read.csv2("data/SPER01_Cq_res.csv")
+cq <- read.csv2("data/data_qpcr_taqman/SPER01_Cq_res.csv")
 cq <- cq[cq$Fluor == "FAM",c("Well", "Cq")]
 
 
@@ -703,10 +664,10 @@ res_taqman <- res_taqman %>%
   left_join(taqman,
             by = c("sp" = "sp", "Dilu" = "mix"))
 
-# write.csv(res_taqman %>% filter(!Neg), "data/res_taqman.csv",
+# write.csv(res_taqman %>% filter(!Neg), "data/data_qpcr_taqman/res_taqman.csv",
 #           row.names = F)
 
-# write.csv(kinetics %>% filter(!Neg), "data/taqman_kinetics.csv",
+# write.csv(kinetics %>% filter(!Neg), "data/data_qpcr_taqman/taqman_kinetics.csv",
 #           row.names = F)
 ```
 
@@ -716,12 +677,12 @@ Open file to check tags
 
 ```{r metabarcoding tags}
 #Forward
-primers1 <- read.table("data/DEL0455463409_bis.csv",
+primers1 <- read.table("data/data_metabarcoding/DEL0455463409_bis.csv",
                        header = T, sep = ",", na.strings = c("N/A", "-"))
 primers1 <- primers1[,-which(is.na(primers1[1,]))]
 
 #Reverse
-primers2 <- read.table("data/DEL0455483280_bis.csv",
+primers2 <- read.table("data/data_metabarcoding/DEL0455483280_bis.csv",
                        header = T, sep = ",", na.strings = c("N/A", "-"))
 primers2 <- primers2[,-which(is.na(primers2[1,]))]
 

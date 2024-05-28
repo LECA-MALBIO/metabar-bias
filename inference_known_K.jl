@@ -1,7 +1,7 @@
 
 ##Inference of PCR efficiencies in metabarcoding data, known K
 ##Sylvain Moinard, LECA
-## 22/05/2024
+## 28/05/2024
 
 #From the final proportions of each species and the PCR amplifiation rates inferred or measured by Taqman qPCR,
 #we infer the initial proportions of each species with the Fixed Landscape Inference MethOd (flimo)
@@ -12,15 +12,15 @@
 
 ##____________________________________________________________________________________________________
 # Setup: load data
-reads_U = Float64.(Matrix(CSV.read("data/reads_U.csv", DataFrame)))
-reads_T = Float64.(Matrix(CSV.read("data/reads_T.csv", DataFrame)))
-reads_G = Float64.(Matrix(CSV.read("data/reads_G.csv", DataFrame)))
+reads_U = Float64.(Matrix(CSV.read("data/export_to_julia/reads_U.csv", DataFrame)))
+reads_T = Float64.(Matrix(CSV.read("data/export_to_julia/reads_T.csv", DataFrame)))
+reads_G = Float64.(Matrix(CSV.read("data/export_to_julia/reads_G.csv", DataFrame)))
 
 # Initial number of molecules, assayed by ddPCR
 
-qty_init_U = vec(Float64.(Matrix(CSV.read("data/qty_initU.csv", DataFrame))))
-qty_init_T = vec(Float64.(Matrix(CSV.read("data/qty_initT.csv", DataFrame))))
-qty_init_G = vec(Float64.(Matrix(CSV.read("data/qty_initG.csv", DataFrame))))
+qty_init_U = vec(Float64.(Matrix(CSV.read("data/export_to_julia/qty_initU.csv", DataFrame))))
+qty_init_T = vec(Float64.(Matrix(CSV.read("data/export_to_julia/qty_initT.csv", DataFrame))))
+qty_init_G = vec(Float64.(Matrix(CSV.read("data/export_to_julia/qty_initG.csv", DataFrame))))
 
 
 ##____________________________________________________________________________________________________
@@ -41,7 +41,7 @@ function full_inference_K(K, id ; nsim = 190)
       show_trace = false) 
     
     Lambda_infer = vcat(1., vec(mean(optU_eff.minimizer, dims  = 1)))
-    CSV.write("data/efficiencies_U_K"*string(id)*".csv", Tables.table(optU_eff.minimizer))
+    CSV.write("data/export_to_r/efficiencies_U_K"*string(id)*".csv", Tables.table(optU_eff.minimizer))
     
     psU = mean(reads_U ./ sum(reads_U, dims = 2), dims = 1)
     
@@ -63,7 +63,7 @@ function full_inference_K(K, id ; nsim = 190)
       nsim = nsim,
       show_trace = false)
 
-      CSV.write("data/prop_inferT_K"*string(id)*".csv", Tables.table(optT_full.minimizer ./ sum(optT_full.minimizer, dims = 2)))
+      CSV.write("data/export_to_r/prop_inferT_K"*string(id)*".csv", Tables.table(optT_full.minimizer ./ sum(optT_full.minimizer, dims = 2)))
 
     
     optG_full = optim_ps(reads_G, Lambda_infer,
@@ -76,7 +76,7 @@ function full_inference_K(K, id ; nsim = 190)
       nsim = nsim,
       show_trace = false)
 
-    CSV.write("data/prop_inferG_K"*string(id)*".csv", Tables.table(optG_full.minimizer ./ sum(optG_full.minimizer, dims = 2)))
+    CSV.write("data/export_to_r/prop_inferG_K"*string(id)*".csv", Tables.table(optG_full.minimizer ./ sum(optG_full.minimizer, dims = 2)))
 
     
     #M_T
@@ -87,15 +87,15 @@ function full_inference_K(K, id ; nsim = 190)
     ag = AbsErr(vec(mean(optG_full.minimizer ./ sum(optG_full.minimizer, dims = 2), dims = 1)), qty_init_G ./ sum(qty_init_G))
     rg = RelErr(vec(mean(optG_full.minimizer ./ sum(optG_full.minimizer, dims = 2), dims = 1)), qty_init_G ./ sum(qty_init_G))
     
-    CSV.write("data/at_rt_ag_rg_K"*string(id)*".csv", Tables.table(vcat(at, rt, ag, rg)))
+    #CSV.write("data/at_rt_ag_rg_K"*string(id)*".csv", Tables.table(vcat(at, rt, ag, rg)))
     return vcat(at, rt, ag, rg)
 end
 
-rmseK1 = full_inference_K(K, 1)
-rmseK2 = full_inference_K(10*K, 0)
-rmseK3 = full_inference_K(K/10, 2)
-rmseK4 = full_inference_K(K/100, 3)
-rmseK5 = full_inference_K(K/1000, 4)
+rmseK1 = full_inference_K(K, 13)
+rmseK2 = full_inference_K(10*K, 14)
+rmseK2 = full_inference_K(100*K, 15)
+rmseK3 = full_inference_K(K/10, 12)
+rmseK4 = full_inference_K(K/100, 11)
 
 rmseK1
 rmseK2

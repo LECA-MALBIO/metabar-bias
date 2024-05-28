@@ -5,9 +5,9 @@
 ## Inference for simulated communities with different total initial amount of molecules
 ##____________________________________________________________________________________________________
 
-commu1 = Float64.(Matrix(CSV.read("data/sim100_m0tot_1.csv", DataFrame)))
-commu2 = Float64.(Matrix(CSV.read("data/sim100_m0tot_2.csv", DataFrame)))
-commu3 = Float64.(Matrix(CSV.read("data/sim100_m0tot_3.csv", DataFrame)))
+commu1 = Float64.(Matrix(CSV.read("data/export_to_julia/sim100_m0tot_1.csv", DataFrame)))
+commu2 = Float64.(Matrix(CSV.read("data/export_to_julia/sim100_m0tot_2.csv", DataFrame)))
+commu3 = Float64.(Matrix(CSV.read("data/export_to_julia/sim100_m0tot_3.csv", DataFrame)))
 
 #pour chaque commu
 #pour chaque sim
@@ -69,9 +69,9 @@ ps_infer3 = ps_infer3  ./ sum(ps_infer3, dims = 2)
 mean(commu3, dims = 1)
 mean(ps_infer3, dims = 1)
 
-CSV.write("data/res_commu1.csv", Tables.table(ps_infer1 ./ sum(ps_infer1, dims = 2)))
-CSV.write("data/res_commu2.csv", Tables.table(ps_infer2 ./ sum(ps_infer2, dims = 2)))
-CSV.write("data/res_commu3.csv", Tables.table(ps_infer3 ./ sum(ps_infer3, dims = 2)))
+CSV.write("data/export_to_r/res_commu1.csv", Tables.table(ps_infer1 ./ sum(ps_infer1, dims = 2)))
+CSV.write("data/export_to_r/res_commu2.csv", Tables.table(ps_infer2 ./ sum(ps_infer2, dims = 2)))
+CSV.write("data/export_to_r/res_commu3.csv", Tables.table(ps_infer3 ./ sum(ps_infer3, dims = 2)))
 
 
 ##Below: Tests
