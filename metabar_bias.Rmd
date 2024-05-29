@@ -32,10 +32,10 @@ output:
 This script is used to produce the analyses of the paper.
 Our data is preprocessed in the data_processing.Rmd file.
 
-Last edit: 28/05/2024
+Last edit: 29/05/2024
 
 
-##Setup
+## Setup
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
