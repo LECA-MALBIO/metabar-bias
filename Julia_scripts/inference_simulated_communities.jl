@@ -9,6 +9,8 @@ commu1 = Float64.(Matrix(CSV.read("data/export_to_julia/sim100_m0tot_1.csv", Dat
 commu2 = Float64.(Matrix(CSV.read("data/export_to_julia/sim100_m0tot_2.csv", DataFrame)))
 commu3 = Float64.(Matrix(CSV.read("data/export_to_julia/sim100_m0tot_3.csv", DataFrame)))
 
+K = 1.204e13
+
 #pour chaque commu
 #pour chaque sim
 #une inference
@@ -17,7 +19,7 @@ ps_infer1 = zeros(size(commu1))
 ps_infer2 = zeros(size(commu2))
 ps_infer3 = zeros(size(commu3))
 
-for sim in 1:size(commu1, 1)
+for sim in axes(commu1, 1)
   opt = optim_ps(reshape(commu1[sim,:], 1, size(commu1, 2)),
   Lambda_infer,
   ninfer = 1,
@@ -35,7 +37,7 @@ ps_infer1 = ps_infer1  ./ sum(ps_infer1, dims = 2)
 mean(commu1, dims = 1)
 mean(ps_infer1, dims = 1)
 
-for sim in 1:size(commu2, 1)
+for sim in axes(commu2, 1)
   opt = optim_ps(reshape(commu2[sim,:], 1, size(commu2, 2)),
   Lambda_infer,
   ninfer = 1,
@@ -52,7 +54,7 @@ ps_infer2 = ps_infer2  ./ sum(ps_infer2, dims = 2)
 mean(commu2, dims = 1)
 mean(ps_infer2, dims = 1)
 
-for sim in 1:size(commu3, 1)
+for sim in axes(commu3, 1)
   opt = optim_ps(reshape(commu3[sim,:], 1, size(commu3, 2)),
   Lambda_infer,
   ninfer = 1,

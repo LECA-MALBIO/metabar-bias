@@ -64,9 +64,9 @@ Information about the barcodes used with Sper01 marker.
 
 ```{r open barcodes}
 
-extraction <- read.csv("data/data_extraction/extraction.csv")
+extraction <- read.csv("data/processed_data/extraction.csv")
 
-barcodes <- read_excel("data/plantes_info/new_plant_positive_control.xlsx")[,c(2,4:6)]
+barcodes <- read_excel("data/plants_info/new_plant_positive_control.xlsx")[,c(2,4:6)]
 names(barcodes) <- c("species_name", "sequence", "length", "gc_content")
 
 barcodes[barcodes$species_name ==
@@ -126,7 +126,7 @@ Converting RFU to number of molecules for illustrative purpose (scaling).
 
 ```{r qpcr open data}
 #Open file containing qPCR data
-ampli <- read.csv("data/data_qpcr_sybr/20210712_101200_CT030043_SPER01_ANALYSE -  Quantification Amplification Results_SYBR.csv")[,-1]
+ampli <- read.csv("data/qpcr_sybr/qpcr_Quantification_Amplification_Results_SYBR.csv")[,-1]
 
 #Ampli : data ready for the plot
 ampli <- ampli %>% pivot_longer(2:ncol(ampli))
@@ -293,7 +293,7 @@ Dataframe summary_experiment contains all info concerning the concentration assa
 
 ```{r open ddpcr data}
 #QuantaSoft output file with additional data
-dataddpcr <- read_csv("data/data_ddpcr/dataddpcr.csv")
+dataddpcr <- read_csv("data/processed_data/dataddpcr.csv")
 # Used columns:
 # Sample: Number of the plant sample
 # Concentration: Assayed copies/ul in well
@@ -455,7 +455,7 @@ Pipeline from raw fastq data: see data_processing.Rmd file (we used the obitools
 Open data, filter bad PCR replicates:
 
 ```{r open metabarcoding data}
-df_Sper01 <- read_csv("data/data_metabarcoding/df_Sper01.csv")
+df_Sper01 <- read_csv("data/processed_data/df_Sper01.csv")
 
 #Summarising all information for each sample:
 summary_sample <- df_Sper01 %>%
@@ -684,7 +684,7 @@ df_targetG <- df_targetG %>% left_join(correcU) %>%
 
 Export data to Julia to infer efficiencies and proportions with flimo
 
-The files used are metabar_bias_functions.jl and inference_known_K.jl.
+The files used are metabar_bias_functions.jl and inference_efficiencies_ps.jl.
 
 ```{r export julia}
 #Reads / species / replicates in M_U
@@ -741,7 +741,7 @@ qty_initG <- left_join(data.frame(species_name = colnames(readsU)),
 
 Proportions inferred in Julia using PCR efficiencies
 
-Run metabar_bias_functions.jl (functions) and inference_known_K.jl (inference of efficiencies from M_U and then proportions in M_T and M_G) and inference_taqman.jl (processing the taqman analysis)
+Run metabar_bias_functions.jl (functions) and inference_efficiencies_ps.jl (inference of efficiencies from M_U and then proportions in M_T and M_G).
 
 #### Efficiencies
 
@@ -847,8 +847,9 @@ In this section, efficiencies of 3 species are estimated from a Taqman qPCR assa
 Open data (prepared in data_processing.Rmd)
 
 ```{r open taqman}
-res_taqman <- read.csv("data/data_qpcr_taqman/res_taqman.csv")
-kinetics <- read.csv("data/data_qpcr_taqman/taqman_kinetics.csv")
+quantif_taqman <- read.csv(
+  "data/processed_data/quantification_taqman.csv")
+kinetics <- read.csv("data/processed_data/taqman_kinetics.csv")
 ```
 
 Plot amplification curves and Ct = f(concentration)
@@ -857,7 +858,7 @@ Plot amplification curves and Ct = f(concentration)
 ggplot(kinetics)+
   geom_line(aes(Cycle, RFU, group = Well, col = probe))
 
-ggplot(res_taqman)+
+ggplot(quantif_taqman)+
   geom_point(aes(copies_ul, Cq, group = Well, col = probe))+
   #Cq = quantification cycle = Ct = threshold cycle
   scale_x_log10()+
@@ -872,38 +873,38 @@ Using the relation Ct = a log(concentration) + b
 ```{r linear regression taqman}
 Vmix_taq <- 25 #ul volume of a well for Taqman qPCR
 
-res_taqman$slope <- NA
-res_taqman$intercept <- NA
+quantif_taqman$slope <- NA
+quantif_taqman$intercept <- NA
 
 #For each probe, compute the regression
-for (s in unique(res_taqman$probe)){
+for (s in unique(quantif_taqman$probe)){
   reg <- lm(Cq ~ log10(copies),
-            res_taqman %>%
+            quantif_taqman %>%
               filter(probe == s) %>%
               group_by(Dilu) %>%
               summarise(Cq = mean(Cq),
                         copies = Vmix_taq*copies_ul[1]))
   
-  res_taqman[res_taqman$probe == s, "slope"] <- reg$coefficients[2]
-  res_taqman[
-    res_taqman$probe == s, "intercept"] <- reg$coefficients[1]
+  quantif_taqman[quantif_taqman$probe == s, "slope"] <- reg$coefficients[2]
+  quantif_taqman[
+    quantif_taqman$probe == s, "intercept"] <- reg$coefficients[1]
 }
 
 #Estimate constants of the model
 
 #Estimated efficiency
-res_taqman$rate <- 10^(-1/res_taqman$slope)-1 
+quantif_taqman$rate <- 10^(-1/quantif_taqman$slope)-1 
 
 #Estimated number of molecules at C_t
-res_taqman$Mct <- 10^(-res_taqman$intercept/res_taqman$slope)
+quantif_taqman$Mct <- 10^(-quantif_taqman$intercept/quantif_taqman$slope)
 
 #Show results
-res_taqman %>% group_by(probe) %>%
+quantif_taqman %>% group_by(probe) %>%
   summarise(rate = rate[1],
             Mct = Mct[1]/1e11)
 
 #Compute common Mct for the 3 species
-Mct_glob <- res_taqman %>%
+Mct_glob <- quantif_taqman %>%
   group_by(sp) %>%
   summarise(Mct = mean(Mct)) %>% pull(Mct) %>% mean
 
@@ -914,7 +915,7 @@ Mct_glob <- res_taqman %>%
 ```{r pcr efficiencies}
 
 #Computing Lambda from previous estimates
-efficiencies <- res_taqman %>%
+efficiencies <- quantif_taqman %>%
   mutate(Lambda = (Mct_glob/(Vmix_taq*copies_ul))^(1/Cq)-1)
 
 #Show results for each species
@@ -931,7 +932,7 @@ efficiencies_taq <- efficiencies %>% group_by(sp) %>%
   summarise(efficiency = mean(Lambda),
             sdeff = sd(Lambda))
 
-res_taqman <- res_taqman %>% left_join(efficiencies_taq)
+quantif_taqman <- quantif_taqman %>% left_join(efficiencies_taq)
 
 ```
 
