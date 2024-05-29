@@ -637,80 +637,88 @@ summary_dd &lt;- dataddpcr %&gt;% filter(Used &amp; Sample &lt; 100) %&gt;%
 </div>
 <div id="metabarcoding-data-processing" class="section level3">
 <h3>Metabarcoding data processing</h3>
-<p>Folder data/data_metabarcoding</p>
-<p>Processing the data with OBITools version 4 (<a href="https://git.metabarcoding.org/obitools/obitools4/obitools4" class="uri">https://git.metabarcoding.org/obitools/obitools4/obitools4</a>)</p>
-<p>Three communities: * T1 (library 1746) = uniform in Total DNA * G1
-(library 1748) = Geometric * U1 (library 1750) = Uniform</p>
+<p>Data is processed with OBITools version 4 (<a href="https://git.metabarcoding.org/obitools/obitools4/obitools4" class="uri">https://git.metabarcoding.org/obitools/obitools4/obitools4</a>)</p>
+<p>Three communities are processed: * T1 (library 1746) = uniform in
+Total DNA * G1 (library 1748) = Geometric * U1 (library 1750) =
+Uniform</p>
 <div id="bash-commands" class="section level4">
 <h4>Bash commands</h4>
+<pre class="bash"><code>cd data/metabarcoding</code></pre>
 <div id="gobipairing" class="section level5">
 <h5>Gobipairing</h5>
-<p>Paired-end data</p>
-<p>% gobipairing -F 220930_NB501850_A_L1-4_GWM-1746_R1.fastq.gz -R
-220930_NB501850_A_L1-4_GWM-1746_R2.fastq.gz &gt; GWM-1746.paired</p>
-<p>% gobipairing -F 220930_NB501850_A_L1-4_GWM-1748_R1.fastq.gz -R
-220930_NB501850_A_L1-4_GWM-1748_R2.fastq.gz &gt; GWM-1748.paired</p>
-<p>% gobipairing -F 220930_NB501850_A_L1-4_GWM-1750_R1.fastq.gz -R
-220930_NB501850_A_L1-4_GWM-1750_R2.fastq.gz &gt; GWM-1750.paired</p>
+<p>Produce paired-end data:</p>
+<pre class="bash"><code>gobipairing -F 220930_NB501850_A_L1-4_GWM-1746_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1746_R2.fastq.gz &gt; GWM-1746.paired
+
+gobipairing -F 220930_NB501850_A_L1-4_GWM-1748_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1748_R2.fastq.gz &gt; GWM-1748.paired
+
+gobipairing -F 220930_NB501850_A_L1-4_GWM-1750_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1750_R2.fastq.gz &gt; GWM-1750.paired</code></pre>
 </div>
 <div id="convert-json-made-by-metabase-api-to-ngsfilter" class="section level5">
 <h5>Convert json (made by metabase api) to ngsfilter</h5>
 <p>Uses script format_ngsfilter.py Assigns tags to replicates</p>
-<p>% python3 ../../format_ngsfilter.py
-ngs_filter_tube_T1_EC_QMETABAR_210722.json GWM-1746_T1.ngsfilter</p>
-<p>% python3 ../../format_ngsfilter.py
-ngs_filter_tube_G1_EC_QMETABAR_210722.json GWM-1748_G1.ngsfilter</p>
-<p>% python3 ../../format_ngsfilter.py
-ngs_filter_tube_U1_EC_QMETABAR_210722.json GWM-1750_U1.ngsfilter</p>
+<pre class="bash"><code>python3 ../../format_ngsfilter.py ngs_filter_tube_T1_EC_QMETABAR_210722.json GWM-1746_T1.ngsfilter
+
+python3 ../../format_ngsfilter.py ngs_filter_tube_G1_EC_QMETABAR_210722.json GWM-1748_G1.ngsfilter
+
+python3 ../../format_ngsfilter.py ngs_filter_tube_U1_EC_QMETABAR_210722.json GWM-1750_U1.ngsfilter</code></pre>
 </div>
 <div id="gobimultiplex" class="section level5">
 <h5>Gobimultiplex</h5>
 <p>Assigns sequence records to the corresponding experiment/sample based
 on DNA tags and primers</p>
-<p>% gobimultiplex -t GWM-1746_T1.ngsfilter -u unassigned46
-GWM-1746.paired &gt; GWM_1746.demultiplex</p>
-<p>% gobimultiplex -t GWM-1748_G1.ngsfilter -u unassigned48
-GWM-1748.paired &gt; GWM_1748.demultiplex</p>
-<p>% gobimultiplex -t GWM-1750_U1.ngsfilter -u unassigned50
-GWM-1750.paired &gt; GWM_1750.demultiplex</p>
+<pre class="bash"><code>gobimultiplex -t GWM-1746_T1.ngsfilter -u unassigned46 GWM-1746.paired &gt; GWM_1746.demultiplex
+
+gobimultiplex -t GWM-1748_G1.ngsfilter -u unassigned48 GWM-1748.paired &gt; GWM_1748.demultiplex
+
+gobimultiplex -t GWM-1750_U1.ngsfilter -u unassigned50 GWM-1750.paired &gt; GWM_1750.demultiplex</code></pre>
 </div>
 <div id="gobiuniq" class="section level5">
 <h5>Gobiuniq</h5>
 <p>Groups and dereplicates sequences Merges the libraries</p>
-<p>% gobiuniq -m direction -m sample –on-disk GWM_1746.demultiplex
-GWM_1748.demultiplex GWM_1750.demultiplex &gt; GWM_Sper01.uniq</p>
+<pre class="bash"><code>gobiuniq -m direction -m sample --on-disk GWM_1746.demultiplex GWM_1748.demultiplex GWM_1750.demultiplex &gt; GWM_Sper01.uniq</code></pre>
 </div>
 <div id="gobigrep" class="section level5">
 <h5>Gobigrep</h5>
 <p>Filters sequence file Removes singletons, too short and too long
 variants</p>
-<p>% gobigrep -c 2 -l 25 -L 75 GWM_Sper01.uniq &gt; GWM_Sper01.grep</p>
+<pre class="bash"><code>gobigrep -c 2 -l 25 -L 75 GWM_Sper01.uniq &gt; GWM_Sper01.grep</code></pre>
 </div>
 <div id="gobiclean" class="section level5">
 <h5>Gobiclean</h5>
 <p>Tags a set of sequences for PCR/sequencing errors identification</p>
-<p>% gobiclean –save-ratio graphSper01.csv –min-eval-rate 100
-–save-graph graph1 GWM_Sper01.grep &gt; GWM_Sper01.clean</p>
+<pre class="bash"><code>gobiclean --min-eval-rate 100 GWM_Sper01.grep &gt; GWM_Sper01.clean</code></pre>
 </div>
 <div id="gobicount" class="section level5">
 <h5>Gobicount</h5>
 <p>Counts Reads / Variants</p>
 <p>Library T1/1746</p>
-<p>% gobicount GWM-1746.paired 3352859 / 3352859 % gobicount
-GWM_1746.demultiplex 3043811 / 3043811 % gobicount unassigned46 309048 /
-309048</p>
+<pre class="bash"><code>gobicount GWM-1746.paired</code></pre>
+<p>3352859 / 3352859</p>
+<pre class="bash"><code>gobicount GWM_1746.demultiplex</code></pre>
+<p>3043811 / 3043811</p>
+<pre class="bash"><code>gobicount unassigned46</code></pre>
+<p>309048 / 309048</p>
 <p>Library G1/1748</p>
-<p>% gobicount GWM-1748.paired 4025048 / 4025048 % gobicount
-GWM_1748.demultiplex 3683622 / 3683622 % gobicount unassigned48 341426 /
-341426</p>
+<pre class="bash"><code>gobicount GWM-1748.paired</code></pre>
+<p>4025048 / 4025048</p>
+<pre class="bash"><code>cd gobicount GWM_1748.demultiplex</code></pre>
+<p>3683622 / 3683622</p>
+<pre class="bash"><code>gobicount unassigned48</code></pre>
+<p>341426 / 341426</p>
 <p>Library U1/1750</p>
-<p>% gobicount GWM-1750.paired 3910259 / 3910259 % gobicount
-GWM_1750.demultiplex 3618993 / 3618993 % gobicount unassigned50 291266 /
-291266</p>
+<pre class="bash"><code>gobicount GWM-1750.paired</code></pre>
+<p>3910259 / 3910259</p>
+<pre class="bash"><code>gobicount GWM_1750.demultiplex</code></pre>
+<p>3618993 / 3618993</p>
+<pre class="bash"><code>cd gobicount unassigned50</code></pre>
+<p>291266 / 291266</p>
 <p>Merged libraries</p>
-<p>% gobicount GWM_Sper01.uniq 151109 / 10346426 % gobicount
-GWM_Sper01.grep 28371 / 10202369 % gobicount GWM_Sper01.clean 28371 /
-10202369</p>
+<pre class="bash"><code>gobicount GWM_Sper01.uniq</code></pre>
+<p>151109 / 10346426</p>
+<pre class="bash"><code>gobicount GWM_Sper01.grep</code></pre>
+<p>28371 / 10202369</p>
+<pre class="bash"><code>gobicount GWM_Sper01.clean</code></pre>
+<p>28371 / 10202369</p>
 </div>
 <div id="robireadfasta" class="section level5">
 <h5>Robireadfasta</h5>
@@ -803,62 +811,6 @@ df_Sper01 &lt;- df_Sper01 %&gt;% left_join(summary_sample[,1:2]) %&gt;%
 <pre class="r"><code># df_Sper01 %&gt;% filter(Sample == &quot;PCRNeg_G1_R1&quot;) %&gt;% arrange(-reads) #%&gt;% View
 # df_Sper01 %&gt;% filter(Sample == &quot;PCRNeg_T1_R1&quot;) %&gt;% arrange(-reads) #%&gt;% View
 # df_Sper01 %&gt;% filter(Sample == &quot;PCRNeg_U1_R1&quot;) %&gt;% arrange(-reads) #%&gt;% View</code></pre>
-<p>Exports data to Julia for Taqman analysis</p>
-<pre class="r"><code>reads_threshold &lt;- 5000
-
-##Community U
-auxU &lt;- df_Sper01 %&gt;%
-  filter(Community == &quot;U&quot; &amp;
-         species_name %in% barcodes$species_name &amp;
-         total_count_sample &gt; reads_threshold &amp;
-         !NegControl) %&gt;%
-  filter(species_name %in%
-           c(&quot;Fraxinus_excelsior&quot;,
-             &quot;Carpinus_betulus&quot;,
-             &quot;Capsella_bursa-pastoris&quot;)) %&gt;%
-  dplyr::select(species_name, obiclean_weight, Sample) %&gt;%
-  arrange(species_name) %&gt;%
-  pivot_wider(names_from = species_name, values_from = obiclean_weight)
-
-#Matrix:
-matU &lt;- as.matrix(auxU[,-1])
-# write.csv(matU, &quot;data/export_to_julia/dfSper01U_taq.csv&quot;)
-
-##Community T
-auxT &lt;- df_Sper01 %&gt;%
-  filter(Community == &quot;T&quot; &amp;
-         species_name %in% barcodes$species_name &amp;
-         total_count_sample &gt; reads_threshold &amp;
-         !NegControl) %&gt;%
-  filter(species_name %in%
-           c(&quot;Fraxinus_excelsior&quot;,
-             &quot;Carpinus_betulus&quot;,
-             &quot;Capsella_bursa-pastoris&quot;)) %&gt;%
-  dplyr::select(species_name, obiclean_weight, Sample) %&gt;%
-  arrange(species_name) %&gt;%
-  pivot_wider(names_from = species_name, values_from = obiclean_weight)
-
-#Matrix
-matT &lt;- as.matrix(auxT[,-1])
-# write.csv(matT, &quot;data/export_to_julia/dfSper01T_taq.csv&quot;)
-
-##Community G
-auxG &lt;- df_Sper01 %&gt;%
-  filter(Community == &quot;G&quot; &amp;
-         species_name %in% barcodes$species_name &amp;
-         total_count_sample &gt; reads_threshold &amp;
-         !NegControl) %&gt;%
-  filter(species_name %in%
-           c(&quot;Fraxinus_excelsior&quot;,
-             &quot;Carpinus_betulus&quot;,
-             &quot;Capsella_bursa-pastoris&quot;)) %&gt;%
-  dplyr::select(species_name, obiclean_weight, Sample) %&gt;%
-  arrange(species_name) %&gt;%
-  pivot_wider(names_from = species_name, values_from = obiclean_weight)
-
-#Matrix:
-matG &lt;- as.matrix(auxG[,-1])
-# write.csv(matG, &quot;data/export_to_julia/dfSper01G_taq.csv&quot;)</code></pre>
 </div>
 </div>
 </div>

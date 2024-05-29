@@ -283,107 +283,157 @@ summary_dd <- dataddpcr %>% filter(Used & Sample < 100) %>%
 
 ### Metabarcoding data processing
 
-Folder data/data_metabarcoding
-
-Processing the data with OBITools version 4
+Data is processed with OBITools version 4
 (https://git.metabarcoding.org/obitools/obitools4/obitools4)
 
-Three communities:
+Three communities are processed:
 * T1 (library 1746) = uniform in Total DNA
 * G1 (library 1748) = Geometric
 * U1 (library 1750) = Uniform
 
 #### Bash commands
 
+```bash
+cd data/metabarcoding
+```
+
 ##### Gobipairing
 
-Paired-end data
+Produce paired-end data:
 
-% gobipairing -F 220930_NB501850_A_L1-4_GWM-1746_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1746_R2.fastq.gz > GWM-1746.paired
+```bash
+gobipairing -F 220930_NB501850_A_L1-4_GWM-1746_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1746_R2.fastq.gz > GWM-1746.paired
 
-% gobipairing -F 220930_NB501850_A_L1-4_GWM-1748_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1748_R2.fastq.gz > GWM-1748.paired
+gobipairing -F 220930_NB501850_A_L1-4_GWM-1748_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1748_R2.fastq.gz > GWM-1748.paired
 
-% gobipairing -F 220930_NB501850_A_L1-4_GWM-1750_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1750_R2.fastq.gz > GWM-1750.paired
+gobipairing -F 220930_NB501850_A_L1-4_GWM-1750_R1.fastq.gz -R 220930_NB501850_A_L1-4_GWM-1750_R2.fastq.gz > GWM-1750.paired
+```
 
 ##### Convert json (made by metabase api) to ngsfilter
 
 Uses script format_ngsfilter.py
 Assigns tags to replicates
 
-% python3 ../../format_ngsfilter.py ngs_filter_tube_T1_EC_QMETABAR_210722.json GWM-1746_T1.ngsfilter
+```bash
+python3 ../../format_ngsfilter.py ngs_filter_tube_T1_EC_QMETABAR_210722.json GWM-1746_T1.ngsfilter
 
-% python3 ../../format_ngsfilter.py ngs_filter_tube_G1_EC_QMETABAR_210722.json GWM-1748_G1.ngsfilter
+python3 ../../format_ngsfilter.py ngs_filter_tube_G1_EC_QMETABAR_210722.json GWM-1748_G1.ngsfilter
 
-% python3 ../../format_ngsfilter.py ngs_filter_tube_U1_EC_QMETABAR_210722.json GWM-1750_U1.ngsfilter
+python3 ../../format_ngsfilter.py ngs_filter_tube_U1_EC_QMETABAR_210722.json GWM-1750_U1.ngsfilter
+```
 
 ##### Gobimultiplex
 
 Assigns sequence records to the corresponding experiment/sample based on DNA tags and primers
 
-% gobimultiplex -t GWM-1746_T1.ngsfilter -u unassigned46 GWM-1746.paired > GWM_1746.demultiplex
+```bash
+gobimultiplex -t GWM-1746_T1.ngsfilter -u unassigned46 GWM-1746.paired > GWM_1746.demultiplex
 
-% gobimultiplex -t GWM-1748_G1.ngsfilter -u unassigned48 GWM-1748.paired > GWM_1748.demultiplex
+gobimultiplex -t GWM-1748_G1.ngsfilter -u unassigned48 GWM-1748.paired > GWM_1748.demultiplex
 
-% gobimultiplex -t GWM-1750_U1.ngsfilter -u unassigned50 GWM-1750.paired > GWM_1750.demultiplex
+gobimultiplex -t GWM-1750_U1.ngsfilter -u unassigned50 GWM-1750.paired > GWM_1750.demultiplex
+```
 
 ##### Gobiuniq
 
 Groups and dereplicates sequences
 Merges the libraries
 
-% gobiuniq -m direction -m sample --on-disk GWM_1746.demultiplex GWM_1748.demultiplex GWM_1750.demultiplex > GWM_Sper01.uniq
+```bash
+gobiuniq -m direction -m sample --on-disk GWM_1746.demultiplex GWM_1748.demultiplex GWM_1750.demultiplex > GWM_Sper01.uniq
+```
 
 ##### Gobigrep
 
 Filters sequence file
 Removes singletons, too short and too long variants 
 
-% gobigrep -c 2 -l 25 -L 75 GWM_Sper01.uniq > GWM_Sper01.grep
+```bash
+gobigrep -c 2 -l 25 -L 75 GWM_Sper01.uniq > GWM_Sper01.grep
+```
 
 ##### Gobiclean
 
 Tags a set of sequences for PCR/sequencing errors identification
 
-% gobiclean --save-ratio graphSper01.csv --min-eval-rate 100 --save-graph graph1 GWM_Sper01.grep > GWM_Sper01.clean
+```bash
+gobiclean --min-eval-rate 100 GWM_Sper01.grep > GWM_Sper01.clean
+```
 
 ##### Gobicount
 
 Counts Reads / Variants
 
+
 Library T1/1746
 
-% gobicount GWM-1746.paired
+```bash
+gobicount GWM-1746.paired
+```
 3352859 / 3352859
-% gobicount GWM_1746.demultiplex
+
+```bash
+gobicount GWM_1746.demultiplex
+```
 3043811 / 3043811
-% gobicount unassigned46
+
+```bash
+gobicount unassigned46
+```
 309048 / 309048
+
 
 Library G1/1748
 
-% gobicount GWM-1748.paired
+```bash
+gobicount GWM-1748.paired
+```
 4025048 / 4025048
-% gobicount GWM_1748.demultiplex
+
+```bash
+cd gobicount GWM_1748.demultiplex
+```
 3683622 / 3683622
-% gobicount unassigned48
+
+```bash
+gobicount unassigned48
+```
 341426 / 341426
+
 
 Library U1/1750
 
-% gobicount GWM-1750.paired
+```bash
+gobicount GWM-1750.paired
+```
 3910259 / 3910259
-% gobicount GWM_1750.demultiplex
+
+```bash
+gobicount GWM_1750.demultiplex
+```
 3618993 / 3618993
-% gobicount unassigned50
+
+```bash
+cd gobicount unassigned50
+```
 291266 / 291266
+
 
 Merged libraries
 
-% gobicount GWM_Sper01.uniq
+```bash
+gobicount GWM_Sper01.uniq
+```
 151109 / 10346426
-% gobicount GWM_Sper01.grep
+
+```bash
+gobicount GWM_Sper01.grep
+```
 28371 / 10202369
-% gobicount GWM_Sper01.clean
+
+```bash
+gobicount GWM_Sper01.clean
+```
 28371 / 10202369
 
 ##### Robireadfasta
@@ -471,66 +521,6 @@ df_Sper01 %>% filter(NegControl) %>%
 # df_Sper01 %>% filter(Sample == "PCRNeg_G1_R1") %>% arrange(-reads) #%>% View
 # df_Sper01 %>% filter(Sample == "PCRNeg_T1_R1") %>% arrange(-reads) #%>% View
 # df_Sper01 %>% filter(Sample == "PCRNeg_U1_R1") %>% arrange(-reads) #%>% View
-```
-
-Exports data to Julia for Taqman analysis
-
-```{r export julia}
-reads_threshold <- 5000
-
-##Community U
-auxU <- df_Sper01 %>%
-  filter(Community == "U" &
-         species_name %in% barcodes$species_name &
-         total_count_sample > reads_threshold &
-         !NegControl) %>%
-  filter(species_name %in%
-           c("Fraxinus_excelsior",
-             "Carpinus_betulus",
-             "Capsella_bursa-pastoris")) %>%
-  dplyr::select(species_name, obiclean_weight, Sample) %>%
-  arrange(species_name) %>%
-  pivot_wider(names_from = species_name, values_from = obiclean_weight)
-
-#Matrix:
-matU <- as.matrix(auxU[,-1])
-# write.csv(matU, "data/export_to_julia/dfSper01U_taq.csv")
-
-##Community T
-auxT <- df_Sper01 %>%
-  filter(Community == "T" &
-         species_name %in% barcodes$species_name &
-         total_count_sample > reads_threshold &
-         !NegControl) %>%
-  filter(species_name %in%
-           c("Fraxinus_excelsior",
-             "Carpinus_betulus",
-             "Capsella_bursa-pastoris")) %>%
-  dplyr::select(species_name, obiclean_weight, Sample) %>%
-  arrange(species_name) %>%
-  pivot_wider(names_from = species_name, values_from = obiclean_weight)
-
-#Matrix
-matT <- as.matrix(auxT[,-1])
-# write.csv(matT, "data/export_to_julia/dfSper01T_taq.csv")
-
-##Community G
-auxG <- df_Sper01 %>%
-  filter(Community == "G" &
-         species_name %in% barcodes$species_name &
-         total_count_sample > reads_threshold &
-         !NegControl) %>%
-  filter(species_name %in%
-           c("Fraxinus_excelsior",
-             "Carpinus_betulus",
-             "Capsella_bursa-pastoris")) %>%
-  dplyr::select(species_name, obiclean_weight, Sample) %>%
-  arrange(species_name) %>%
-  pivot_wider(names_from = species_name, values_from = obiclean_weight)
-
-#Matrix:
-matG <- as.matrix(auxG[,-1])
-# write.csv(matG, "data/export_to_julia/dfSper01G_taq.csv")
 ```
 
 ## Taqman qPCR
