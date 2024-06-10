@@ -1465,15 +1465,15 @@ Open inference results for MT
 
 ```{r open M_T data, message = FALSE}
 
-inferT15 <- read.csv("data/export_to_r/prop_inferT_K15.csv") #***
-colnames(inferT15) <- colnames(readsT)
-inferT15 <- inferT15 %>%
-              pivot_longer(everything(),
-                           names_to = "species_name",
-                           values_to = "prop") %>%
-  arrange(-dplyr::row_number())
-inferT15$K <- K*100
-inferT15$type <- "K 10^15"
+# inferT15 <- read.csv("data/export_to_r/prop_inferT_K15.csv") #***
+# colnames(inferT15) <- colnames(readsT)
+# inferT15 <- inferT15 %>%
+#               pivot_longer(everything(),
+#                            names_to = "species_name",
+#                            values_to = "prop") %>%
+#  arrange(-dplyr::row_number())
+# inferT15$K <- K*100
+# inferT15$type <- "K 10^15"
 
 inferT14 <- read.csv("data/export_to_r/prop_inferT_K14.csv")
 colnames(inferT14) <- colnames(readsT)
@@ -1483,7 +1483,7 @@ inferT14 <- inferT14 %>%
                            values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferT14$K <- K*10
-inferT14$type <- "K 10^14"
+inferT14$type <- "K = 1.2e14"
 
 inferT13 <- read.csv("data/export_to_r/prop_inferT_K13.csv")
 colnames(inferT13) <- colnames(readsT)
@@ -1493,7 +1493,7 @@ inferT13 <- inferT13 %>%
                            values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferT13$K <- K
-inferT13$type <- "K 10^13"
+inferT13$type <- "K = 1.2e13"
 
 inferT12 <- read.csv("data/export_to_r/prop_inferT_K12.csv")
 colnames(inferT12) <- colnames(readsT)
@@ -1503,7 +1503,7 @@ inferT12 <- inferT12 %>%
                            values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferT12$K <- K/10
-inferT12$type <- "K 10^12"
+inferT12$type <- "K = 1.2e12"
 
 inferT11 <- read.csv("data/export_to_r/prop_inferT_K11.csv")
 colnames(inferT11) <- colnames(readsT)
@@ -1513,9 +1513,10 @@ inferT11 <- inferT11 %>%
                            values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferT11$K <- K/100
-inferT11$type <- "K 10^11"
+inferT11$type <- "K = 1.2e11"
 
-inferTK <- rbind(inferT15, inferT14, inferT13, inferT12, inferT11)
+# inferTK <- rbind(inferT15, inferT14, inferT13, inferT12, inferT11)
+inferTK <- rbind(inferT14, inferT13, inferT12, inferT11)
 inferTK <- inferTK %>% left_join(summary_experiment[,2:3])
 #add species short names
 
@@ -1550,15 +1551,15 @@ Open inference results for MG
 
 ```{r open M_G data, message = FALSE}
 
-inferG15 <- read.csv("data/export_to_r/prop_inferG_K15.csv") #***
-colnames(inferG15) <- colnames(readsG)
-inferG15 <- inferG15 %>%
-              pivot_longer(everything(),
-                           names_to = "species_name",
-                           values_to = "prop") %>%
-  arrange(-dplyr::row_number())
-inferG15$K <- K*100
-inferG15$type <- "K 10^15"
+# inferG15 <- read.csv("data/export_to_r/prop_inferG_K15.csv") #***
+# colnames(inferG15) <- colnames(readsG)
+# inferG15 <- inferG15 %>%
+#               pivot_longer(everything(),
+#                            names_to = "species_name",
+#                            values_to = "prop") %>%
+#   arrange(-dplyr::row_number())
+# inferG15$K <- K*100
+# inferG15$type <- "K 10^15"
 
 inferG14 <- read.csv("data/export_to_r/prop_inferG_K14.csv")
 colnames(inferG14) <- colnames(readsG)
@@ -1568,7 +1569,7 @@ inferG14 <- inferG14 %>%
                            values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferG14$K <- K*10
-inferG14$type <- "K 10^14"
+inferG14$type <- "K = 1.2e14"
 
 inferG13 <- read.csv("data/export_to_r/prop_inferG_K13.csv")
 colnames(inferG13) <- colnames(readsG)
@@ -1578,7 +1579,7 @@ inferG13 <- inferG13 %>%
                            values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferG13$K <- K
-inferG13$type <- "K 10^13"
+inferG13$type <- "K = 1.2e13"
 
 inferG12 <- read.csv("data/export_to_r/prop_inferG_K12.csv")
 colnames(inferG12) <- colnames(readsG)
@@ -1588,7 +1589,7 @@ inferG12 <- inferG12 %>%
                            values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferG12$K <- K/10
-inferG12$type <- "K 10^12"
+inferG12$type <- "K = 1.2e12"
 
 inferG11 <- read.csv("data/export_to_r/prop_inferG_K11.csv")
 colnames(inferG11) <- colnames(readsG)
@@ -1598,9 +1599,10 @@ inferG11 <- inferG11 %>%
                            values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferG11$K <- K/100
-inferG11$type <- "K 10^11"
+inferG11$type <- "K = 1.2e11"
 
-inferGK <- rbind(inferG15, inferG14, inferG13, inferG12, inferG11)
+# inferGK <- rbind(inferG15, inferG14, inferG13, inferG12, inferG11)
+inferGK <- rbind(inferG14, inferG13, inferG12, inferG11)
 inferGK <- inferGK %>% left_join(summary_experiment[,2:3]) #add short names
 
 #average proportions
@@ -1634,7 +1636,9 @@ Barplots for the two communities
 
 ```{r suppl fig 2}
 
-order_type <- c("Theoretical", "K 10^11", "K 10^12", "K 10^13","K 10^14","K 10^15", "Ratio", "Observed")
+# order_type <- c("Theoretical", "K 10^11", "K 10^12", "K 10^13","K 10^14","K 10^15", "Ratio", "Observed")
+
+order_type <- c("Theoretical", "K = 1.2e11", "K = 1.2e12", "K = 1.2e13","K = 1.2e14", "Ratio", "Observed")
 
 gTK <- ggplot(inferTK)+
   geom_col(aes(x = factor(type, levels = order_type, ordered = T),
