@@ -1685,6 +1685,35 @@ annotate_figure(fig,
 
 ```
 
+```{r variation with K, message=FALSE}
+
+#Proportions vary with K:
+
+inferTK %>% filter(type %in% c("K 10^11", "K 10^12", "K 10^14", "K 10^15")) %>% #***
+  left_join(
+  inferTK %>%
+    filter(type == "K 10^13") %>%
+    rename(propK13 = prop) %>% dplyr::select(sp, propK13)) %>%
+  mutate(variation = (prop - propK13)/propK13) %>%
+  group_by(type) %>% summarise(min_var = min(abs(variation)),
+                               max_var = max(abs(variation)),
+                               mean_var = mean(abs(variation)))
+
+inferGK %>% filter(type %in% c("K 10^11", "K 10^12", "K 10^14", "K 10^15")) %>% #***
+  left_join(
+  inferGK %>%
+    filter(type == "K 10^13") %>%
+    rename(propK13 = prop) %>% dplyr::select(sp, propK13)) %>%
+  mutate(variation = (prop - propK13)/propK13) %>%
+  group_by(type) %>% summarise(min_var = min(abs(variation)),
+                               max_var = max(abs(variation)),
+                               mean_var = mean(abs(variation)))
+
+
+
+```
+
+
 ## Supplementary Table 1: C-values
 
 Mass of one genome for the 13 species.
@@ -1869,6 +1898,24 @@ ggplot(compo)+
 # ggsave(filename = "Figures/simu_exp_log.pdf",
 #        dpi = 600, units = "mm",
 #        width = 150, height = 180, device = "pdf")
+
+```
+
+## Number of cycles to perform to reach saturation
+
+How many cycles are needed for a uniform community to reach saturation ?
+
+```{r cycles before saturation}
+
+m0tot <- 2.5e5
+
+pcr_complete <- pcr_sim(m0=rep(m0tot/nrow(summary_experiment),
+                           nrow(summary_experiment)),
+                    lambda=summary_experiment$efficiencies,
+                    K=K,
+                cycles = ncycles)
+
+rowSums(pcr_complete)/K
 
 ```
 
