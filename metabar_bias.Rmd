@@ -64,12 +64,14 @@ library(qpcR)
 Information about the barcodes used with Sper01 marker.
 
 ```{r open barcodes, message = FALSE}
-
+#Extraction data
 extraction <- read.csv("data/processed_data/extraction.csv")
 
+#Barcodes information
 barcodes <- read_excel("data/plants_info/new_plant_positive_control.xlsx")[,c(2,4:6)]
 names(barcodes) <- c("species_name", "sequence", "length", "gc_content")
 
+#Polymorphism for species Salvia pratensis
 barcodes[barcodes$species_name ==
             "Salvia_pratensis",]$sequence <-
   "atcctgttttctcaaaacaaaggttcaaaaaacgaaaaaaaaaaag"
@@ -111,10 +113,11 @@ L <- barcodes$sequence %>% nchar %>% mean
 
 n_p <- 2*5e-6*2e-6 #quantity of primers, mol : 2 (F+R) * 5uM * 2ul 
 
+#Maximum theoretical value of K is Ksup
 Ksup <- min(c_n*Vwell/L, n_p)*N_A
-Ksup <- n_p*N_A
+Ksup <- n_p*N_A #Primers are limiting
 
-K <- Ksup
+K <- Ksup #K = Ksup assuming PCR reaction is total 
 ```
 
 ## Figure 1: PCR models
@@ -334,13 +337,11 @@ CDNA_U <- 0.5
 C_species_ref <- CDNA_U/13 #concentration of each species, ng/ul
 
 summary_experiment <- summary_experiment %>%
-  mutate(Volume_equi = max(Molecules_ng)/Molecules_ng,
+  mutate(Volume_equi = max(Molecules_ng)/Molecules_ng,#Volume to take to be as concentrated as 1 ul of Ptr 6 (most concentrated
          cDNA_U = C_species_ref*Volume_equi,
          #Concentration of total DNA to use in the U commu
          molecules_U = cDNA_U*Molecules_ng, #Molecules/ul in sample
-         propU = molecules_U/sum(molecules_U), #species proportion
-         Volume_equi = max(Molecules_ng)/Molecules_ng,
-         #Volume to take to be as concentrated as 1 ul of Ptr 6 (most concentrated)
+         propU = molecules_U/sum(molecules_U),#species proportion
           RankG = 13 - rank(CDNA_sample/Volume_equi) + 1)
 ```
 
@@ -348,7 +349,11 @@ Number of molecules in the M_U community
 
 ```{r commu M_U}
 VDNA_metab <- 2 #Volume of DNA used in the mix, ul
-VDNA_metab * summary_experiment$molecules_U #Molecules of each species in mix
+
+#Molecules of each species in mix
+summary_experiment %>% dplyr::select(species_name, molecules_U) %>%
+  mutate(molecules_mix = VDNA_metab*molecules_U)
+
 VDNA_metab * sum(summary_experiment$molecules_U) #Total number of molecules
 ```
 
@@ -361,7 +366,10 @@ summary_experiment <- summary_experiment %>%
   mutate(molecules_T = C_species_ref*Molecules_ng, #molecules/ul of sample
          propT = molecules_T/sum(molecules_T)) #species proportions
 
-VDNA_metab * summary_experiment$molecules_T #Molecules of each species in mix
+#Molecules of each species in mix
+summary_experiment %>% dplyr::select(species_name, molecules_T) %>%
+  mutate(molecules_mix = VDNA_metab*molecules_T)
+
 VDNA_metab * sum(summary_experiment$molecules_T) #total number of molecules
 
 ```
@@ -377,7 +385,10 @@ summary_experiment <- summary_experiment %>%
          molecules_G = cDNA_G*Molecules_ng,
          propG = molecules_G/sum(molecules_G))
 
-summary_experiment$molecules_G * VDNA_metab #Molecules of each species in mix
+#Molecules of each species in mix
+summary_experiment %>% dplyr::select(species_name, molecules_G) %>%
+  mutate(molecules_mix = VDNA_metab*molecules_G)
+
 sum(summary_experiment$molecules_G) * VDNA_metab #Total number of molecules
 ```
 
@@ -397,9 +408,11 @@ Target DNA concentrations of each sample
 
 ```{r ddpcr analysis, message = FALSE}
 
+#Open ddpcr data for figure 3
 data_dd_fig <- dataddpcr %>%
   left_join(summary_experiment %>% dplyr::select(sp, species_name, RankG))
 
+#Rank of the species
 order_short <- summary_experiment %>% dplyr::select(sp, RankG) %>%
   arrange(-RankG) %>% pull(sp)
 
@@ -408,9 +421,11 @@ highlight <- function(x, pat, color="black", family="") {
 }
 
 ggplot(data_dd_fig)+
+  #Replicates values:
   geom_point(aes(factor(sp, levels = order_short, ordered = T),
                  Concentration_copies_ng/1000,
                  shape = as.factor(TotalDNA)))+
+  #Median values:
   geom_point(data = summary_experiment,
              aes(as.factor(sp), Molecules_ng/1000),
              fill = "red", shape = 23, size = 3)+
@@ -435,12 +450,14 @@ Species Populus tremula and Rhododendron ferrugineum
 Number of copies/ng of total DNA for the two extreme species.
 
 ```{r stats ddpcr}
+#Populus tremula
 data_dd_fig %>% filter(sp == "Ptr") %>%
   pull(Concentration_copies_ng) %>% summary
 
 data_dd_fig %>% filter(sp == "Ptr") %>%
   pull(Concentration_copies_ng) %>% sd
 
+#Rhododendron ferrugineum
 data_dd_fig %>% filter(sp == "Rfe") %>%
   pull(Concentration_copies_ng) %>% summary
 
@@ -511,6 +528,7 @@ df_targetU <- df_Sper01 %>%
            species_name %in% barcodes$species_name &
                           total_count_sample > reads_threshold &
                           !NegControl) %>%
+  #observed proportions:
   mutate(prop = obiclean_weight/total_count_sample) %>%
   left_join(summary_experiment %>%
               dplyr::select(species_name, sp, propU)) %>%
@@ -527,6 +545,7 @@ df_targetT <- df_Sper01 %>%
            species_name %in% barcodes$species_name &
            total_count_sample > reads_threshold &
            !NegControl) %>%
+  #observed proportions:
   mutate(prop = obiclean_weight/total_count_sample) %>%
   left_join(summary_experiment %>%
               dplyr::select(species_name, sp, propT)) %>%
@@ -543,6 +562,7 @@ df_targetG <- df_Sper01 %>%
            species_name %in% barcodes$species_name &
            total_count_sample > reads_threshold &
            !NegControl) %>%
+  #observed proportions:
   mutate(prop = obiclean_weight/total_count_sample) %>%
   left_join(summary_experiment %>%
               dplyr::select(species_name, sp, propG)) %>%
@@ -560,13 +580,16 @@ colp <- c("Expected" = "gold",
 
 #M_U community: obs/expected proportions
 gobsU <- ggplot(df_targetU)+
+  #Observed proportions:
   geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
                    prop))+
+  #No PCR bias:
       geom_point(data = summary_experiment,
              aes(sp, 1/nrow(summary_experiment),
                  fill = "Expected\nwithout\nPCR bias"),
              shape = 23,
              size = 3)+
+  #No bias:
     geom_hline(aes(yintercept = 1/nrow(summary_experiment),
                 col = "Expected\nwithout\nPCR and\nconcentration\nbiases"),
              linetype = "dashed")+
@@ -582,12 +605,15 @@ gobsU <- ggplot(df_targetU)+
   
 #M_T community: obs/expected proportions
 gobsT <- ggplot(df_targetT)+
+  #Observed proportions:
   geom_boxplot(aes(factor(sp, levels = order_short, ordered = T),
                    prop))+
+  #No PCR bias:
     geom_point(data = summary_experiment,
              aes(sp, propT, fill = "Expected\nwithout\nPCR bias"),
              shape = 23,
              size = 3)+
+  #No bias:
   geom_hline(aes(yintercept = 1/nrow(summary_experiment),
                 col = "Expected\nwithout\nPCR and\nconcentration\nbiases"),
              linetype = "dashed")+
@@ -640,11 +666,11 @@ This approach considers that the factor bias is independent to the whole communi
 
 Correction factor computed from community M_U is:
 
-a_s = prop_obs(s)/prop_init(s) (* constant value)
+$$\text{Correction factor: }a_s = \frac{\text{prop}_{obs}(s)}{\text{prop}_{init}(s)} (\times \: \text{constant value})$$
+Then:
 
-then prop_infer_mock(s) = prop_obs(s)/a_s(M_U)
+$$\text{Proportions inferred by ratio method:} \:\: p_s = \frac{\text{prop}_{obs}(s)}{a_s}$$
 
-where prop_infer_mock are the inferred proportions established by this ratio correction.
 
 ```{r correction mock, message = FALSE}
 
@@ -655,27 +681,27 @@ correcU <- df_targetU %>%
 
 #Verifying on the M_U community that correction works
 df_targetU <- df_targetU %>% left_join(correcU) %>%
-  mutate(prop_infer_mock = prop/correc) %>%
+  mutate(prop_infer_ratio = prop/correc) %>%
   group_by(Sample) %>%
-  mutate(prop_infer_mock = prop_infer_mock/sum(prop_infer_mock,
+  mutate(prop_infer_ratio = prop_infer_ratio/sum(prop_infer_ratio,
                                                na.rm = T)) %>%
   mutate(species_name = factor(species_name, levels = order_sp,
                                   ordered = T))
 
 #Applying correction to M_T
 df_targetT <- df_targetT %>% left_join(correcU) %>%
-    mutate(prop_infer_mock = prop/correc) %>%
+    mutate(prop_infer_ratio = prop/correc) %>%
   group_by(Sample) %>%
-  mutate(prop_infer_mock = prop_infer_mock/sum(prop_infer_mock,
+  mutate(prop_infer_ratio = prop_infer_ratio/sum(prop_infer_ratio,
                                                na.rm = T)) %>%
   mutate(species_name = factor(species_name, levels = order_sp,
                                   ordered = T))
 
 #Appplying correction to M_G
 df_targetG <- df_targetG %>% left_join(correcU) %>%
-  mutate(prop_infer_mock = prop/correc) %>%
+  mutate(prop_infer_ratio = prop/correc) %>%
   group_by(Sample) %>%
-  mutate(prop_infer_mock = prop_infer_mock/sum(prop_infer_mock,
+  mutate(prop_infer_ratio = prop_infer_ratio/sum(prop_infer_ratio,
                                                na.rm = T)) %>%
   mutate(species_name = factor(species_name, levels = order_sp,
                                   ordered = T))
@@ -756,6 +782,7 @@ colnames(efficiencies_infer) <- colnames(readsU)
 
 apply(efficiencies_infer, 2, sd)
 
+#Add efficiencies to summary_experiment
 summary_experiment <- summary_experiment %>%
   left_join(efficiencies_infer %>%
               as_tibble() %>%
@@ -809,14 +836,14 @@ resU <- df_targetU %>%
   group_by(species_name) %>%
   summarise(prop = median(prop),
             prop_expected = prop_expected[1],
-            prop_infer_mock = median(prop_infer_mock))
+            prop_infer_ratio = median(prop_infer_ratio))
 
 #Raw and Corrected proportions of the different species in M_T
 resT <- df_targetT %>%
   group_by(species_name) %>%
   summarise(prop = median(prop), #Observed
             prop_expected = prop_expected[1], #Expected
-            prop_infer_mock = median(prop_infer_mock)) %>% #Corrected by ratio
+            prop_infer_ratio = median(prop_infer_ratio)) %>% #Corrected by ratio
   left_join(inferT %>% #inferred with Lambda_s
               pivot_longer(everything(),
                            names_to = "species_name",
@@ -831,7 +858,7 @@ resG <- df_targetG %>%
   group_by(species_name) %>%
   summarise(prop = median(prop),
             prop_expected = prop_expected[1],
-            prop_infer_mock = median(prop_infer_mock)) %>%
+            prop_infer_ratio = median(prop_infer_ratio)) %>%
   left_join(inferG %>%
               pivot_longer(everything(),
                            names_to = "species_name",
@@ -974,11 +1001,14 @@ resU %>% dplyr::select(species_name, prop_expected, prop)
 #Efficiencies estimated by Taqman
 efficiencies_taq
 #Normalized efficiencies from Taqman
+Lambda_Fex <- summary_experiment %>% filter(sp == "Fex") %>% pull(efficiencies)
+
 efficiencies %>% group_by(probe) %>%
     summarise(efficiency = mean(Lambda),
               sdeff = sd(Lambda)) %>%
-  mutate(efficiency = efficiency/efficiencies_taq$efficiency[3]*0.927, #Fex
-         sdeff = sdeff/efficiencies_taq$efficiency[3]*0.927) #Fex
+  #Divide Lambda_s so that Lambda_Fex inferred by flimo = Lambda_Fex taqman
+  mutate(efficiency = efficiency/efficiencies_taq$efficiency[3]*Lambda_Fex, 
+         sdeff = sdeff/efficiencies_taq$efficiency[3]*Lambda_Fex)
 
 #Efficiencies estimated with flimo
 summary_experiment %>% arrange(RankG) %>%
@@ -1065,16 +1095,22 @@ for (cyc in Cycles){ #Considering cyc as neff
 
 }
 
+#Proportions (with exponential model) in M_U for different values of neff
 ggplot(res_exp)+
   geom_line(aes(cycle, psU, col = sp))+
   geom_hline(yintercept = 1/13)+
-  geom_vline(xintercept = neffU)
+  geom_vline(xintercept = neffU)+
+  ggtitle("Proportions in M_U for different values of neff")
 
+#Proportions (with exponential model) in M_T for different values of neff
 ggplot(res_exp)+
-  geom_line(aes(cycle, psT, col = sp))
+  geom_line(aes(cycle, psT, col = sp))+
+  ggtitle("Proportions in M_T for different values of neff")
 
+#Proportions(with exponential model)  in M_G for different values of neff
 ggplot(res_exp)+
-  geom_line(aes(cycle, psG, col = sp))
+  geom_line(aes(cycle, psG, col = sp))+
+  ggtitle("Proportions in M_G for different values of neff")
 
 ```
 
@@ -1105,11 +1141,11 @@ RelErr(resU$prop, resU$prop_expected)
 summary(resT$prop)
 
 AbsErr(resT$prop, resT$prop_expected)
-AbsErr(resT$prop_infer_mock, resT$prop_expected)
+AbsErr(resT$prop_infer_ratio, resT$prop_expected)
 AbsErr(resT$prop_infer_Lambda, resT$prop_expected)
 
 RelErr(resT$prop, resT$prop_expected)
-RelErr(resT$prop_infer_mock, resT$prop_expected)
+RelErr(resT$prop_infer_ratio, resT$prop_expected)
 RelErr(resT$prop_infer_Lambda, resT$prop_expected)
 
 #RMSE of T if it is considered as a uniform community
@@ -1120,11 +1156,11 @@ RelErr(resT$prop, resU$prop_expected)
 summary(resG$prop)
 
 AbsErr(resG$prop, resG$prop_expected)
-AbsErr(resG$prop_infer_mock, resG$prop_expected)
+AbsErr(resG$prop_infer_ratio, resG$prop_expected)
 AbsErr(resG$prop_infer_Lambda, resG$prop_expected)
 
 RelErr(resG$prop, resG$prop_expected)
-RelErr(resG$prop_infer_mock, resG$prop_expected)
+RelErr(resG$prop_infer_ratio, resG$prop_expected)
 RelErr(resG$prop_infer_Lambda, resG$prop_expected)
 ```
 
@@ -1171,24 +1207,24 @@ D <- function(ps, q){
 
 D(resT$prop_expected, 1)
 D(resT$prop, 1)
-D(resT$prop_infer_mock, 1)
+D(resT$prop_infer_ratio, 1)
 D(resT$prop_infer_Lambda, 1)
 
 D(resT$prop_expected, 2)
 D(resT$prop, 2)
-D(resT$prop_infer_mock, 2)
+D(resT$prop_infer_ratio, 2)
 D(resT$prop_infer_Lambda, 2)
 
 #M_G
 
 D(resG$prop_expected, 1)
 D(resG$prop, 1)
-D(resG$prop_infer_mock, 1)
+D(resG$prop_infer_ratio, 1)
 D(resG$prop_infer_Lambda, 1)
 
 D(resG$prop_expected, 2)
 D(resG$prop, 2)
-D(resG$prop_infer_mock, 2)
+D(resG$prop_infer_ratio, 2)
 D(resG$prop_infer_Lambda, 2)
 ```
 
@@ -1504,9 +1540,9 @@ inferTK <- rbind(inferTK,
 
 #Proportions corrected by ratio
 inferTK <- rbind(inferTK,
-                resT %>% dplyr::select(species_name, prop_infer_mock) %>%
+                resT %>% dplyr::select(species_name, prop_infer_ratio) %>%
   left_join(summary_experiment %>% dplyr::select(species_name, sp)) %>%
-  rename(prop = prop_infer_mock) %>% mutate(type = "Ratio"))
+  rename(prop = prop_infer_ratio) %>% mutate(type = "Ratio"))
 
 ```
 
@@ -1588,9 +1624,9 @@ inferGK <- rbind(inferGK,
 
 #Proportions corrected by ratio
 inferGK <- rbind(inferGK,
-                resG %>% dplyr::select(species_name, prop_infer_mock) %>%
+                resG %>% dplyr::select(species_name, prop_infer_ratio) %>%
   left_join(summary_experiment %>% dplyr::select(species_name, sp)) %>%
-  rename(prop = prop_infer_mock) %>% mutate(type = "Ratio"))
+  rename(prop = prop_infer_ratio) %>% mutate(type = "Ratio"))
 
 ```
 
