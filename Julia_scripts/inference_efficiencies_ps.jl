@@ -91,14 +91,9 @@ function full_inference_K(K, id ; nsim = 190)
     return vcat(at, rt, ag, rg)
 end
 
-rmseK1 = full_inference_K(K, 13)
-rmseK2 = full_inference_K(10*K, 14)
-rmseK2 = full_inference_K(100*K, 15)
-rmseK3 = full_inference_K(K/10, 12)
-rmseK4 = full_inference_K(K/100, 11)
+rmseK13 = full_inference_K(K, 13)
+rmseK14 = full_inference_K(10*K, 14)
+rmseK12 = full_inference_K(K/10, 12)
+rmseK11 = full_inference_K(K/100, 11)
 
-rmseK1
-rmseK2
-rmseK3
-rmseK4
-rmseK5
+rmseK15 = full_inference_K(100*K, 15)

@@ -32,7 +32,7 @@ output:
 This script is used to produce the analyses of the paper.
 Our data is preprocessed in the data_processing.Rmd file.
 
-Last edit: 29/05/2024
+Last edit: 10/06/2024
 
 
 ## Setup
@@ -50,6 +50,7 @@ library(ggtext)
 library(glue)
 library(latex2exp)
 library(readxl)
+library(scales)
 library(tidyverse)
 
 options(rgl.useNULL=TRUE)
@@ -62,7 +63,7 @@ library(qpcR)
 
 Information about the barcodes used with Sper01 marker.
 
-```{r open barcodes}
+```{r open barcodes, message = FALSE}
 
 extraction <- read.csv("data/processed_data/extraction.csv")
 
@@ -77,7 +78,7 @@ barcodes <- barcodes %>% filter(species_name != "Rumex_acetosa")
 #This species is not used in this experiment
 ```
 
-```{r table1}
+```{r table1, message = FALSE}
 #Information about barcodes and extracted concentrations
 barcodes %>% left_join(extraction[,-2])
 ```
@@ -262,11 +263,13 @@ res_log <- slope*fitlog$m$predict(newdata = fitlog$DATA) + intercept
 ```{r saturation models - figure 1}
 
 ggplot()+
+        #Data:
         geom_point(data = ampli, aes(Cycle-1, molecules))+
+        #Logistic model:
         geom_line(data = NULL, aes(0:60, res_log,
                                    col = "Logistic"),
                   linewidth = 0.75)+
-        geom_point(data = ampli, aes(Cycle-1, molecules))+
+        #Exponential model:
         geom_line(data = NULL, aes(0:60, res_exp,
                                    col = "Exponential"),
                   linewidth = 0.75)+
@@ -291,8 +294,8 @@ ggplot()+
 
 Dataframe summary_experiment contains all info concerning the concentration assays.
 
-```{r open ddpcr data}
-#QuantaSoft output file with additional data
+```{r open ddpcr data, message = FALSE}
+#QuantaSoft output file with additional data (added in data_processing.Rmd)
 dataddpcr <- read_csv("data/processed_data/dataddpcr.csv")
 # Used columns:
 # Sample: Number of the plant sample
@@ -392,7 +395,7 @@ order_sp <- summary_experiment %>%
 
 Target DNA concentrations of each sample
 
-```{r ddpcr analysis}
+```{r ddpcr analysis, message = FALSE}
 
 data_dd_fig <- dataddpcr %>%
   left_join(summary_experiment %>% dplyr::select(sp, species_name, RankG))
@@ -454,7 +457,7 @@ Pipeline from raw fastq data: see data_processing.Rmd file (we used the obitools
 
 Open data, filter bad PCR replicates:
 
-```{r open metabarcoding data}
+```{r open metabarcoding data, message = FALSE}
 df_Sper01 <- read_csv("data/processed_data/df_Sper01.csv")
 
 #Summarising all information for each sample:
@@ -500,7 +503,7 @@ Observed and expected proportions in final composition.
 
 #### Community M_U
 
-```{r analysis M_U}
+```{r analysis M_U, message = FALSE}
 #df_targetU contains clean data of species abundances in each replicates of the M_U community
 
 df_targetU <- df_Sper01 %>%
@@ -516,7 +519,7 @@ df_targetU <- df_Sper01 %>%
 
 #### Community M_T
 
-```{r analysis M_T}
+```{r analysis M_T, message = FALSE}
 #df_targetT contains clean data of species abundances in each replicates of the M_T community
 
 df_targetT <- df_Sper01 %>%
@@ -532,7 +535,7 @@ df_targetT <- df_Sper01 %>%
 
 #### Community M_G
 
-```{r analysis M_G}
+```{r analysis M_G, message = FALSE}
 #df_targetG contains clean data of species abundances in each replicates of the M_G community
 
 df_targetG <- df_Sper01 %>%
@@ -643,7 +646,7 @@ then prop_infer_mock(s) = prop_obs(s)/a_s(M_U)
 
 where prop_infer_mock are the inferred proportions established by this ratio correction.
 
-```{r correction mock}
+```{r correction mock, message = FALSE}
 
 #CorrecU computes the correction factor
 correcU <- df_targetU %>%
@@ -686,7 +689,7 @@ Export data to Julia to infer efficiencies and proportions with flimo
 
 The files used are metabar_bias_functions.jl and inference_efficiencies_ps.jl.
 
-```{r export julia}
+```{r export julia, message = FALSE}
 #Reads / species / replicates in M_U
 readsU <- df_targetU %>%
   dplyr::select(Sample, obiclean_weight, species_name) %>%
@@ -745,7 +748,7 @@ Run metabar_bias_functions.jl (functions) and inference_efficiencies_ps.jl (infe
 
 #### Efficiencies
 
-```{r efficiencies M_U Julia}
+```{r efficiencies M_U Julia, message = FALSE}
 #Inferred efficiencies
 efficiencies_infer <- cbind(1, #Lambda_RosaCanina
                     read_csv("data/export_to_r/efficiencies_U_K13.csv"))
@@ -766,7 +769,7 @@ summary_experiment <- summary_experiment %>%
 
 Loading inferred proportions computed in Julia
 
-```{r results julia M_T}
+```{r results julia M_T, message = FALSE}
 #Species proportions inferred for M_T in Julia
 inferT <- read.csv("data/export_to_r/prop_inferT_K13.csv")
 colnames(inferT) <- colnames(readsT)
@@ -782,7 +785,7 @@ inferT %>%
 
 ```
 
-```{r results julia M_G}
+```{r results julia M_G, message = FALSE}
 #Species proportions inferred for M_G in Julia
 inferG <- read.csv("data/export_to_r/prop_inferG_K13.csv")
 colnames(inferG) <- colnames(readsG)
@@ -799,7 +802,7 @@ inferG %>%
 
 #### Merge the results
 
-```{r inference results}
+```{r inference results, message = FALSE}
 
 #Raw and Corrected proportions of the different species in M_U
 resU <- df_targetU %>%
@@ -912,7 +915,7 @@ Mct_glob <- quantif_taqman %>%
 
 ### Computing PCR efficiencies
 
-```{r pcr efficiencies}
+```{r pcr efficiencies, message = FALSE}
 
 #Computing Lambda from previous estimates
 efficiencies <- quantif_taqman %>%
@@ -1001,7 +1004,7 @@ resG
 Computation of neff for M_U (number of effective exponential cycles) with the truncated exponential model
 
 
-```{r}
+```{r prop exponential, message = FALSE}
 
 #Combine data in summary_experiment
 summary_experiment <- summary_experiment %>%
@@ -1197,7 +1200,7 @@ Simulated amplification to quantify the effect of efficiency differences.
 
 pcr_sim : Function to simulate PCR with multiple species
 
-```{r simu pcr multi species}
+```{r simu pcr multi species, message = FALSE}
 pcr_sim <- function(m0=1,
                     lambda=rep(1, length(m0)),
                     K=1e13,
@@ -1317,16 +1320,7 @@ ggplot()+
 
 Import all the results from Julia where Lambda_s and proportions were inferred with different values of K ranging from 10^11 to 10^14.
 
-```{r open lambda data}
-#K = 1.2 10^15
-efficiencies_inferK15 <- cbind(1,
-                    read_csv("data/export_to_r/efficiencies_U_K15.csv"))
-colnames(efficiencies_inferK15) <- colnames(readsU)
-efficiencies_inferK15 <- efficiencies_inferK15 %>%
-              as_tibble() %>%
-              pivot_longer(1:13, names_to = "species_name",
-                           values_to = "efficiencies")
-efficiencies_inferK15$K <- K*100
+```{r open lambda data, message = FALSE}
 
 #K = 1.2 10^14
 efficiencies_inferK14 <- cbind(1,
@@ -1366,8 +1360,7 @@ efficiencies_inferK13 <- efficiencies_infer %>%
 efficiencies_inferK13$K <- K
 
 #Merged results for supp fig 1
-eff_infer_sf1 <- rbind(efficiencies_inferK15,
-                       efficiencies_inferK14,
+eff_infer_sf1 <- rbind(efficiencies_inferK14,
                        efficiencies_inferK13,
                        efficiencies_inferK12,
                        efficiencies_inferK11) %>%
@@ -1378,7 +1371,7 @@ eff_infer_sf1 <- rbind(efficiencies_inferK15,
 
 Lambda_s = f(K)
 
-```{r open sup fig 1}
+```{r open suppl fig 1, message = FALSE}
 eff_infer_sf1 <- eff_infer_sf1 %>%
          filter(species_name != "Rosa_canina")
 
@@ -1402,7 +1395,7 @@ ggplot(eff_infer_sf1 %>%
 
 Normalising by Lambda_min :
 
-```{r supp fig 1bis}
+```{r suppl fig 1bis, message = FALSE}
 eff_infer_sf1 <- eff_infer_sf1 %>%
   left_join(eff_infer_sf1 %>%
               filter(sp == "Gro") %>%
@@ -1434,181 +1427,225 @@ ggplot(eff_infer_sf1 %>%
 
 Open inference results for MT
 
-```{r open M_T data}
-inferT15 <- read.csv("data/export_to_r/prop_inferT_K15.csv")
+```{r open M_T data, message = FALSE}
+
+inferT15 <- read.csv("data/export_to_r/prop_inferT_K15.csv") #***
 colnames(inferT15) <- colnames(readsT)
 inferT15 <- inferT15 %>%
               pivot_longer(everything(),
                            names_to = "species_name",
-                           values_to = "prop_infer_Lambda") %>%
+                           values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferT15$K <- K*100
+inferT15$type <- "K 10^15"
 
 inferT14 <- read.csv("data/export_to_r/prop_inferT_K14.csv")
 colnames(inferT14) <- colnames(readsT)
 inferT14 <- inferT14 %>%
               pivot_longer(everything(),
                            names_to = "species_name",
-                           values_to = "prop_infer_Lambda") %>%
+                           values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferT14$K <- K*10
+inferT14$type <- "K 10^14"
 
 inferT13 <- read.csv("data/export_to_r/prop_inferT_K13.csv")
 colnames(inferT13) <- colnames(readsT)
 inferT13 <- inferT13 %>%
               pivot_longer(everything(),
                            names_to = "species_name",
-                           values_to = "prop_infer_Lambda") %>%
+                           values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferT13$K <- K
+inferT13$type <- "K 10^13"
 
 inferT12 <- read.csv("data/export_to_r/prop_inferT_K12.csv")
 colnames(inferT12) <- colnames(readsT)
 inferT12 <- inferT12 %>%
               pivot_longer(everything(),
                            names_to = "species_name",
-                           values_to = "prop_infer_Lambda") %>%
+                           values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferT12$K <- K/10
+inferT12$type <- "K 10^12"
 
 inferT11 <- read.csv("data/export_to_r/prop_inferT_K11.csv")
 colnames(inferT11) <- colnames(readsT)
 inferT11 <- inferT11 %>%
               pivot_longer(everything(),
                            names_to = "species_name",
-                           values_to = "prop_infer_Lambda") %>%
+                           values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferT11$K <- K/100
-
+inferT11$type <- "K 10^11"
 
 inferTK <- rbind(inferT15, inferT14, inferT13, inferT12, inferT11)
 inferTK <- inferTK %>% left_join(summary_experiment[,2:3])
+#add species short names
 
-inferTK <- inferTK %>% group_by(sp, K) %>%
-  summarise(species_name = species_name[1], prop_infer_Lambda = mean(prop_infer_Lambda))
+#Average proportions
+inferTK <- inferTK %>% group_by(sp, type) %>%
+  summarise(species_name = species_name[1],
+            prop = mean(prop))
 
 # write.csv(inferTK, "data/inferTK.csv")
 
+#Observed proportions
 inferTK <- rbind(inferTK,
                  resT %>% dplyr::select(species_name, prop) %>%
   left_join(summary_experiment %>% dplyr::select(species_name, sp)) %>%
-  rename(prop_infer_Lambda = prop) %>% mutate(K = 0))
+  rename(prop = prop) %>% mutate(type = "Observed"))
 
+#Theoretical proportions
 inferTK <- rbind(inferTK,
                  resT %>% dplyr::select(species_name, prop_expected) %>%
   left_join(summary_experiment %>% dplyr::select(species_name, sp)) %>%
-  rename(prop_infer_Lambda = prop_expected) %>% mutate(K = 1))
+  rename(prop = prop_expected) %>% mutate(type = "Theoretical"))
+
+#Proportions corrected by ratio
+inferTK <- rbind(inferTK,
+                resT %>% dplyr::select(species_name, prop_infer_mock) %>%
+  left_join(summary_experiment %>% dplyr::select(species_name, sp)) %>%
+  rename(prop = prop_infer_mock) %>% mutate(type = "Ratio"))
+
 ```
 
 Open inference results for MG
 
-```{r open M_G data}
+```{r open M_G data, message = FALSE}
 
-inferG15 <- read.csv("data/export_to_r/prop_inferG_K15.csv")
+inferG15 <- read.csv("data/export_to_r/prop_inferG_K15.csv") #***
 colnames(inferG15) <- colnames(readsG)
 inferG15 <- inferG15 %>%
               pivot_longer(everything(),
                            names_to = "species_name",
-                           values_to = "prop_infer_Lambda") %>%
+                           values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferG15$K <- K*100
+inferG15$type <- "K 10^15"
 
 inferG14 <- read.csv("data/export_to_r/prop_inferG_K14.csv")
 colnames(inferG14) <- colnames(readsG)
 inferG14 <- inferG14 %>%
               pivot_longer(everything(),
                            names_to = "species_name",
-                           values_to = "prop_infer_Lambda") %>%
+                           values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferG14$K <- K*10
+inferG14$type <- "K 10^14"
 
 inferG13 <- read.csv("data/export_to_r/prop_inferG_K13.csv")
 colnames(inferG13) <- colnames(readsG)
 inferG13 <- inferG13 %>%
               pivot_longer(everything(),
                            names_to = "species_name",
-                           values_to = "prop_infer_Lambda") %>%
+                           values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferG13$K <- K
+inferG13$type <- "K 10^13"
 
 inferG12 <- read.csv("data/export_to_r/prop_inferG_K12.csv")
 colnames(inferG12) <- colnames(readsG)
 inferG12 <- inferG12 %>%
               pivot_longer(everything(),
                            names_to = "species_name",
-                           values_to = "prop_infer_Lambda") %>%
+                           values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferG12$K <- K/10
+inferG12$type <- "K 10^12"
 
 inferG11 <- read.csv("data/export_to_r/prop_inferG_K11.csv")
 colnames(inferG11) <- colnames(readsG)
 inferG11 <- inferG11 %>%
               pivot_longer(everything(),
                            names_to = "species_name",
-                           values_to = "prop_infer_Lambda") %>%
+                           values_to = "prop") %>%
   arrange(-dplyr::row_number())
 inferG11$K <- K/100
+inferG11$type <- "K 10^11"
 
 inferGK <- rbind(inferG15, inferG14, inferG13, inferG12, inferG11)
-inferGK <- inferGK %>% left_join(summary_experiment[,2:3])
+inferGK <- inferGK %>% left_join(summary_experiment[,2:3]) #add short names
 
-inferGK <- inferGK %>% group_by(sp, K) %>%
-  summarise(species_name = species_name[1], prop_infer_Lambda = mean(prop_infer_Lambda))
+#average proportions
+inferGK <- inferGK %>% group_by(sp, type) %>%
+  summarise(species_name = species_name[1],
+            prop = mean(prop))
 
 # write.csv(inferGK, "data/inferGK.csv")
 
+#Observed proportions
 inferGK <- rbind(inferGK,
                  resG %>% dplyr::select(species_name, prop) %>%
   left_join(summary_experiment %>% dplyr::select(species_name, sp)) %>%
-  rename(prop_infer_Lambda = prop) %>% mutate(K = 0))
+  rename(prop = prop) %>% mutate(type = "Observed"))
 
+#Expected proportions
 inferGK <- rbind(inferGK,
                  resG %>% dplyr::select(species_name, prop_expected) %>%
   left_join(summary_experiment %>% dplyr::select(species_name, sp)) %>%
-  rename(prop_infer_Lambda = prop_expected) %>% mutate(K = 1))
+  rename(prop = prop_expected) %>% mutate(type = "Theoretical"))
+
+#Proportions corrected by ratio
+inferGK <- rbind(inferGK,
+                resG %>% dplyr::select(species_name, prop_infer_mock) %>%
+  left_join(summary_experiment %>% dplyr::select(species_name, sp)) %>%
+  rename(prop = prop_infer_mock) %>% mutate(type = "Ratio"))
 
 ```
 
 Barplots for the two communities
 
-```{r supp fig 2}
+```{r suppl fig 2}
 
-inferTK$xK <- NA
-inferTK[inferTK$K == K,"xK"] <- "1.2e13"
-inferTK[inferTK$K == K*10,"xK"] <- "1.2e14" 
-inferTK[inferTK$K == K*100,"xK"] <- "1.2e15" 
-inferTK[inferTK$K == K/10,"xK"] <- "1.2e12" 
-inferTK[inferTK$K == K/100,"xK"] <- "1.2e11" 
-inferTK[inferTK$K == 1,"xK"] <- "exp."
-inferTK[inferTK$K == 0,"xK"] <- "obs." 
+order_type <- c("Theoretical", "K 10^11", "K 10^12", "K 10^13","K 10^14","K 10^15", "Ratio", "Observed")
 
-ggplot(inferTK)+
-  geom_col(aes(x = xK, y = prop_infer_Lambda, fill = sp),
+gTK <- ggplot(inferTK)+
+  geom_col(aes(x = factor(type, levels = order_type, ordered = T),
+               y = prop,
+               fill = factor(sp, levels = order_short, ordered = T)),
         position = "fill")+
-  labs(x = "K", y = "Proportions", fill = "Species")
+  scale_fill_manual(values=hue_pal()(13))+
+  ggtitle(TeX("Uniform in Total DNA community (${{M}_T}$)"))+
+  labs(x = "", y = "", fill = "Species")+
+  theme(legend.title = element_text(hjust = 0.5),
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x=element_markdown())
 
 # ggsave(filename = "Figures/commu_K_MT.pdf",
 #        dpi = 600, units = "mm",
 #        width = 150, height = 180, device = "pdf")
 
-inferGK$xK <- NA
-inferGK[inferTK$K == K,"xK"] <- "1.2e13"
-inferGK[inferTK$K == K*10,"xK"] <- "1.2e14" 
-inferGK[inferTK$K == K*100,"xK"] <- "1.2e15" 
-inferGK[inferTK$K == K/10,"xK"] <- "1.2e12" 
-inferGK[inferTK$K == K/100,"xK"] <- "1.2e11" 
-inferGK[inferTK$K == 1,"xK"] <- "exp."
-inferGK[inferTK$K == 0,"xK"] <- "obs." 
-
-ggplot(inferGK)+
-  geom_col(aes(x = xK, y = prop_infer_Lambda, fill = sp),
+gGK <- ggplot(inferGK)+
+  geom_col(aes(x = factor(type, levels = order_type, ordered = T),
+               y = prop,
+               fill = factor(sp, levels = (order_short), ordered = T)),
         position = "fill")+
+  scale_fill_manual(values=hue_pal()(13))+
+  ggtitle(TeX("Geometric community (${{M}_G}$)"))+
   # scale_y_log10()+
-  labs(x = "K", y = "Proportions", fill = "Species")
+  labs(x="", y="", fill = "Species")+
+  theme(legend.title = element_text(hjust = 0.5),
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x=element_markdown())
 
 # ggsave(filename = "Figures/commu_K_MG.pdf",
 #        dpi = 600, units = "mm",
 #        width = 150, height = 180, device = "pdf")
+
+
+#Merge both figures
+fig <- ggpubr::ggarrange(gTK, gGK,
+                  ncol = 1,
+                  common.legend = T,
+                  legend = "right")
+annotate_figure(fig,
+                bottom = text_grob("Type of proportions"),
+                left = text_grob("Species proportions", 
+                                 rot = 90))
+
+# ggsave("Figures/resultsK.pdf", units = "mm",
+#        width = 180, height = 200, dpi = 600, device = "pdf")
 
 ```
 
@@ -1641,7 +1678,7 @@ summary_experiment %>% arrange(RankG)
 
 The initial number of molecules varies in the M_U community:
 
-```{r MU changing M0}
+```{r MU changing M0, message = FALSE}
 
 #Different values of total number of molecules at the beginning
 M0tot <- 2.5e5*c(1e-1, 1, 1e1)
@@ -1692,7 +1729,7 @@ Corrections are brought with our approach and with the ratio method (assuming ex
 
 #### Simulate communities
 
-```{r Ratio method}
+```{r Ratio method, message = FALSE}
 #Reference community is simulated with M0tot = 2.5e5 as in the study
 compo_ref <- compo %>%
   filter(M0tot == 2.5e5) %>%
@@ -1736,7 +1773,7 @@ Inference is performed in file inference_simulated_communities.jl
 
 Import inference results
 
-```{r import julia inference}
+```{r import julia inference, message = FALSE}
 
 res_commu1 <- read.csv("data/export_to_r/res_commu1.csv")
 res_commu2 <- read.csv("data/export_to_r/res_commu2.csv")
