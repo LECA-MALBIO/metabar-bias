@@ -2,9 +2,14 @@
 
 This project contains the data and analysis scripts linked to the paper:
 
+The web site presenting data and methods of this manuscript is available at :
+
+  - https://leca-malbio.github.io/metabar-bias/
+
+
 ***Towards quantitative DNA Metabarcoding: A method to overcome PCR amplification bias***
 
-05/10/23: The paper is available as a preprint. Cite as:
+16/10/24: The paper is available as a preprint. Cite as:
 
 *Towards quantitative DNA Metabarcoding: A method to overcome PCR amplification bias
 Sylvain Moinard, Didier Piau, Frederic Laporte, Delphine Rioux, Pierre Taberlet, Eric Coissac, Christelle Gonindard-Melodelima
