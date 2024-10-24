@@ -1881,6 +1881,8 @@ Gonindard-Melodelima bioRxiv doi: <a href="https://doi.org/10.1101/2023.10.03.56
 allows to reproduce all these files with the <a href="http://metabarcoding.org/obitools4">OBITools 4</a> softwares. The
 pipeline is shown in file <a href="data_processing.html">data_processing.Rmd</a>, section
 Metabarcoding data processing</p>
+<div id="the-raw-data" class="section level5" number="1.1.3.1">
+<h5><span class="header-section-number">1.1.3.1</span> The raw data</h5>
 <p>Raw paired-end sequencing data produced during metabarcoding
 experiment:</p>
 <ul>
@@ -1913,13 +1915,16 @@ reads</li>
 <li><a href="data/metabarcoding/DEL0455483280_bis.csv"><code>DEL0455483280_bis.csv</code></a>
 : Reverse tags</li>
 </ul>
-<p>Data processed with the obitools softwares. All the bash scripts are
-available in file <a href="data_processing.html">data_processing.Rmd</a>.</p>
-<p>First, generate .paired files from raw reads data with
-<code>obipairing</code> (part of <a href="http://metabarcoding.org/obitools4">OBITools 4</a>).</p>
-<p>Then, run script <a href="data/metabarcoding/format_ngsfilter.py"><code>format_ngsfilter.py</code></a>
-in directory <code>data/metabarcoding</code> using .json files:</p>
-<p>.json contain all the information about the PCR plates.</p>
+</div>
+<div id="the-raw-data-processing" class="section level5" number="1.1.3.2">
+<h5><span class="header-section-number">1.1.3.2</span> The raw data
+processing</h5>
+<p>Data is processed using the <a href="http://metabarcoding.org/obitools4">OBITools version 4</a>
+software. All bash commands used to process the date are available in
+file <a href="data_processing.html">data_processing.Rmd</a>.</p>
+<ul>
+<li><p><code>*.json</code> files contain all the information about the
+PCR plates.</p>
 <ul>
 <li><a href="data/metabarcoding/ngs_filter_tube_G1_EC_QMETABAR_210722.json"><code>ngs_filter_tube_G1_EC_QMETABAR_210722.json</code></a>
 : community <span class="math inline">\(M_G\)</span></li>
@@ -1927,8 +1932,9 @@ in directory <code>data/metabarcoding</code> using .json files:</p>
 : community <span class="math inline">\(M_T\)</span></li>
 <li><a href="data/metabarcoding/ngs_filter_tube_U1_EC_QMETABAR_210722.json"><code>ngs_filter_tube_U1_EC_QMETABAR_210722.json</code></a>
 : community <span class="math inline">\(M_U\)</span></li>
-</ul>
-<p>produced files:</p>
+</ul></li>
+<li><p><code>*.ngsfilter</code> files are produced from
+<code>*.json</code> files:</p>
 <ul>
 <li><a href="data/metabarcoding/GWM-1746_T1.ngsfilter"><code>GWM-1746_T1.ngsfilter</code></a>
 : community <span class="math inline">\(M_T\)</span></li>
@@ -1936,22 +1942,30 @@ in directory <code>data/metabarcoding</code> using .json files:</p>
 : community <span class="math inline">\(M_G\)</span></li>
 <li><a href="data/metabarcoding/GWM-1750_U1.ngsfilter"><code>GWM-1750_U1.ngsfilter</code></a>
 : community <span class="math inline">\(M_U\)</span></li>
-</ul>
-<p>Generate .demultiplex files using gobidemultiplex (not stored on
-git).</p>
-<p>Generate .uniq file containing data of the three communities using
-gobuniq:</p>
+</ul></li>
+<li><p><code>*.demultiplex</code> : FASTQ files with metabarcode reads
+assigned to samples</p>
 <ul>
-<li><code>GWM_Sper01.uniq</code></li>
-</ul>
-<p>Generate .grep file with filtered sequences:</p>
+<li>XXXX VOIR AVEC SYLVAIN XXXX</li>
+</ul></li>
+<li><p><code>*.uniq</code> : A FASTA dereplicated version of the three
+<code>*.demultiplex</code> files:</p>
 <ul>
-<li><code>GWM_Sper01.grep</code></li>
-</ul>
-<p>Generate .clean file to filter erroneous sequences:</p>
+<li><a href="data/metabarcoding/GWM_Sper01.uniq"><code>GWM_Sper01.uniq</code></a>
+: include data from the three communities</li>
+</ul></li>
+<li><p><code>*.grep</code> : A FASTA file without singleton, too short
+(<span class="math inline">\(&lt;25\;bp\)</span>), and too long (<span class="math inline">\(&gt; 75\;bp\)</span>) sequences:</p>
 <ul>
-<li><code>GWM_Sper01.clean</code></li>
+<li><a href="data/metabarcoding/GWM_Sper01.grep"><code>GWM_Sper01.grep</code></a></li>
+</ul></li>
+<li><p><code>*.clean</code> FASTA file annotated for spurious PCR
+generated sequences:</p>
+<ul>
+<li><a href="data/metabarcoding/GWM_Sper01.clean"><code>GWM_Sper01.clean</code></a></li>
+</ul></li>
 </ul>
+</div>
 </div>
 <div id="dataplants_info" class="section level4" number="1.1.4">
 <h4><span class="header-section-number">1.1.4</span>
