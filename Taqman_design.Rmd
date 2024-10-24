@@ -5,7 +5,6 @@ author:
   - name: Sylvain Moinard
     institute: leca
     email: sylvain.moinard@univ-grenoble-alpes.fr
-    correspondence: true
   - name: Didier Piau
     institute: ijf
   - name: Frédéric Laporte
@@ -24,7 +23,13 @@ institute:
   - leca: Univ. Grenoble-Alpes, Univ. Savoie Mont Blanc, CNRS, LECA, 38000, Grenoble, France.
   - ijf: Univ. Grenoble-Alpes, CNRS, Institut Joseph Fourier, 38000, Grenoble, France.
 output:
-  html_document
+  html_document: 
+    df_print: paged
+    number_sections: yes
+    pandoc_args:
+      - '--lua-filter=style/scholarly-metadata.lua'
+      - '--lua-filter=style/author-info-blocks.lua'
+    css: style/splendor.css
 ---
 
 
